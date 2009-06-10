@@ -1,0 +1,29 @@
+# cat=basic/enable; type=string; label=Server Url: Define the full url to your Server (example.: http://www.mydomain.com/backup.php)
+serverUrl =
+
+# cat=basic/enable; type=string; label=Additional Server Info: You can give some extra info that will be sent to the server (get param &additionalInfo=...)
+additionalInfo =
+
+# cat=basic/enable; type=boolean; label=Notify Server: Notify the Server by default (usually fetches the backupfiles and clears them afterward)
+notifyServer = 1
+
+# cat=basic/enable; type=boolean; label=Delete BackupFiles: Delete the backupfiles after they have been fetched by the server (you need to set something for additionalInfo [security])
+deleteFilesByServer = 1
+
+# cat=basic/enable; type=boolean; label=Clear DB: Clear the DB by default (clear all cache tables)
+clearDb = 1
+
+# cat=basic/enable; type=boolean; label=Compress DB: Compress the DB with gz
+compressDb = 1
+
+# cat=basic/enable; type=boolean; label=Clear FileSystem: Clear the FileSystem by default (clear all temporary files)
+clearFileSystem = 1
+
+# cat=basic/enable; type=string; label=Filename: Define a different filename if you want (by default its the TYPO3 sitename)
+filename =
+
+# cat=basic/enable; type=string; label=Not by Default: Don't export these folders/files by default (you can still check them manually) [separted with ,]
+notDefaultList = typo3_src
+
+# cat=basic/enable; type=string; label=Path BackupFiles: Path where the BackupFiles should be placed
+backupPath = ../typo3temp/completebackup/
