@@ -11,13 +11,13 @@ notifyServer = 1
 deleteFilesByServer = 1
 
 # cat=basic/enable; type=boolean; label=Clear DB: Clear the DB by default (clear all cache tables)
-clearDb = 1
+clearDb = 0
 
 # cat=basic/enable; type=boolean; label=Compress DB: Compress the DB with gz
 compressDb = 1
 
 # cat=basic/enable; type=boolean; label=Clear FileSystem: Clear the FileSystem by default (clear all temporary files)
-clearFileSystem = 1
+clearFileSystem = 0
 
 # cat=basic/enable; type=string; label=Filename: Define a different filename if you want (by default its the TYPO3 sitename)
 filename =
