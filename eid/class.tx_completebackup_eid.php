@@ -36,7 +36,7 @@ class tx_completebackup_eid extends tslib_pibase {
 		if( isset($_REQUEST['key']) && $_REQUEST['key'] == md5($this->conf['additionalInfo']) ) {
 
 			if( isset($_REQUEST['mode']) && $_REQUEST['mode'] == 'clearBackupCache' )
-				$this->clearCache(PATH_typo3 . $this->conf['backupPath']);
+				$this->clearCache(PATH_site . $this->conf['backupPath']);
 			
 			echo 'OK';
 			

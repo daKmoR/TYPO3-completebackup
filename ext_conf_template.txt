@@ -23,7 +23,7 @@ clearFileSystem = 0
 filename =
 
 # cat=basic/enable; type=string; label=Not by Default: Don't export these folders/files by default (you can still check them manually) [separted with ,]
-notDefaultList = typo3_src
+notDefaultList = typo3_src,.git,.gitmodules,.gitignore
 
 # cat=basic/enable; type=string; label=Path BackupFiles: Path where the BackupFiles should be placed
-backupPath = ../typo3temp/completebackup/
+backupPath = typo3temp/completebackup/

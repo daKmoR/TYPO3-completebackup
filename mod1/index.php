@@ -117,12 +117,12 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$this->createZip( $zipName );
 		$this->createSql( $sqlName );
 		if ( $this->conf['notifyServer'] ) 
-			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/' . $this->conf['backupPath'] . $zipName, $this->getPageDIR() . '/' . $this->conf['backupPath'] . $sqlName );
+			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $zipName, $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName );
 		
 		$content = '';
 		$content .= 'The Backupfiles: <br />';
-		$content .= '<a href="' . $this->conf['backupPath'] . $zipName . '">' . $zipName . '</a><br />';
-		$content .= '<a href="' . $this->conf['backupPath'] . $sqlName . '">' . $sqlName . '</a><br />';
+		$content .= '<a href="../' . $this->conf['backupPath'] . $zipName . '">' . $zipName . '</a><br />';
+		$content .= '<a href="../' . $this->conf['backupPath'] . $sqlName . '">' . $sqlName . '</a><br />';
 		$content .= 'are created.<br />';
 		
 		if ( $this->conf['notifyServer'] && $this->conf['serverUrl'] != '' )
@@ -138,7 +138,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			$this->cleanDb();
 	
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.MySQLDump.php';
-		$dumper = new MySQLDump( TYPO3_db, $this->conf['backupPath'] . $name, $this->conf['compressDb']);
+		$dumper = new MySQLDump( TYPO3_db, PATH_site . $this->conf['backupPath'] . $name, $this->conf['compressDb']);
 		$dumper->doDump();
 	}
 	
@@ -208,7 +208,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.AdvZipArchive.php';
 		$myZip = new AdvZipArchive();
-		if( $myZip->open( $this->conf['backupPath'] . $name, ZIPARCHIVE::CREATE) ) {
+		if( $myZip->open( PATH_site . $this->conf['backupPath'] . $name, ZIPARCHIVE::CREATE) ) {
 			foreach( $files as $file => $state ) {
 				if ( is_dir( PATH_site . $file) )
 					$myZip->addDir( PATH_site . $file, $file );

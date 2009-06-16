@@ -13,11 +13,15 @@
 	$path = './';  // where to put the downloaded files?
 	
 	// you may want to use wget or some other system tool in a real backup server
-	$zipName = basename($_REQUEST['zip']);
-	file_put_contents($path . $zipName, file_get_contents($_REQUEST['zip']) );
+	if( isset($_REQUEST['zip']) && $_REQUEST['zip']  != '' ) {
+		$zipName = basename($_REQUEST['zip']);
+		file_put_contents($path . $zipName, file_get_contents($_REQUEST['zip']) );
+	}
 	
-	$sqlName = basename($_REQUEST['sql']);
-	file_put_contents($path . $sqlName, file_get_contents($_REQUEST['sql']) );
+	if( isset($_REQUEST['sql']) && $_REQUEST['sql']  != '' ) {
+		$sqlName = basename($_REQUEST['sql']);
+		file_put_contents($path . $sqlName, file_get_contents($_REQUEST['sql']) );
+	}
 
 	// if the backupfiles should be deleted afterward you can use the service url provided
 	if( $_REQUEST['service'] && $_REQUEST['deleteAfter'] && $_REQUEST['additionalInfo'] ) {
