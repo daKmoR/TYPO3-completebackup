@@ -206,9 +206,9 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			
 		$files = $_REQUEST['completebackup']['files'];
 		
-		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.AdvZipArchive.php';
-		$myZip = new AdvZipArchive();
-		if( $myZip->open( PATH_site . $this->conf['backupPath'] . $name, ZIPARCHIVE::CREATE) ) {
+		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
+		$myZip = new Tar();
+		if( $myZip->open(PATH_site . $this->conf['backupPath'] . $name) ) {
 			foreach( $files as $file => $state ) {
 				if ( is_dir( PATH_site . $file) )
 					$myZip->addDir( PATH_site . $file, $file );
@@ -218,6 +218,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			$myZip->close();
 			return true;
 		}
+		return false;
 	}
 	
 	function showMenu() {
