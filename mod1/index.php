@@ -254,8 +254,8 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$content .= '
 			<h3>Just hit the Button</h3>
 			<form action="" method="post">
-				<button style="font-size: 50px;">Create a Backup</button><br /> <br />
-				<div>You usually don\'t want to mess with the options below</div>
+				<button style="font-size: 40px; padding: 10px 40px;">DO THE JOB</button><br /> <br />
+				<div style="margin: 15px 0 5px; color: #ff3333; font-weight: bold;">You usually don\'t want to mess with the options below</div>
 				<fieldset>
 					<legend>Files/Folder to Backup</legend>
 					<input type="hidden" name="completebackup[mode]" value="createBackup" />
