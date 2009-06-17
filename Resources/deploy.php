@@ -57,7 +57,7 @@
 		
 		public function hasRequestSqlConfig() {
 			if( isset($_REQUEST['typo_db_username']) && $_REQUEST['typo_db_username'] != '' &&
-				  isset($_REQUEST['typo_db_password']) && $_REQUEST['typo_db_password'] != '' &&
+				  isset($_REQUEST['typo_db_password']) &&
 					isset($_REQUEST['typo_db_host']) && $_REQUEST['typo_db_host'] != '' &&
 					isset($_REQUEST['typo_db']) && $_REQUEST['typo_db'] != '' ) {
 				return true;
