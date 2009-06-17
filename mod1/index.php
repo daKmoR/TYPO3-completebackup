@@ -112,10 +112,10 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$this->conf['clearFileSystem'] = (isset($getConf['clearFileSystem']) && $getConf['clearFileSystem'] == 'on') ? 1 : 0;
 
 		$name = date('Y_m_d-Hm') . '_' . $this->conf['filename'];
-		$zipName = $name . '.zip';
+		$zipName = ($this->conf['compressFileSystem']) ? $name . '.tar.gz' : $name . '.tar';
 		$sqlName = ($this->conf['compressDb']) ? $name . '.sql.gz' : $name . '.sql';
 		$this->createZip( $zipName );
-		$this->createSql( $sqlName );
+		//$this->createSql( $sqlName );
 		if ( $this->conf['notifyServer'] ) 
 			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $zipName, $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName );
 		
@@ -196,7 +196,10 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		if( $this->conf['deleteFilesByServer'] )
 			$params['deleteAfter'] = 1;
 			
-		$url = $this->conf['serverUrl'] . '?' . http_build_query($params, '', '&');
+		$url = $this->conf['serverUrl'];
+		$url .= (strpos($this->conf['serverUrl'], '?') === false) ? '?' : '&';
+		$url .=  http_build_query($params, '', '&');
+		
 		return file_get_contents( $url );
 	}
 	
@@ -207,7 +210,8 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$files = $_REQUEST['completebackup']['files'];
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
-		$myZip = new Tar();
+		// $myZip = new Tar( $this->conf['compressFileSystem'] );
+		$myZip = new Tar( false );
 		if( $myZip->open(PATH_site . $this->conf['backupPath'] . $name) ) {
 			foreach( $files as $file => $state ) {
 				if ( is_dir( PATH_site . $file) )
@@ -248,10 +252,12 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 				</fieldset>
 				<fieldset>
 					<legend>Options</legend>
+					' . $this->getCheckBox('completebackup[conf][fileSystemBackup]', $this->conf['fileSystemBackup']) . ' Create a FileSystem Backup <br />' . PHP_EOL . ' 
+					' . $this->getCheckBox('completebackup[conf][dataBaseBackup]', $this->conf['dataBaseBackup']) . ' Create a Database Backup <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][notifyServer]', $this->conf['notifyServer']) . ' Notify Server [' . $this->conf['serverUrl'] . '] <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][deleteFilesByServer]', $this->conf['deleteFilesByServer']) . ' Delete the backupfiles after they have been fetched by the server (only works if Notify Server) <br />' . PHP_EOL . ' 
-					' . $this->getCheckBox('completebackup[conf][clearDb]', $this->conf['clearDb']) . ' clear DB <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][clearFileSystem]', $this->conf['clearFileSystem']) . ' clear File System <br />' . PHP_EOL . ' 
+					' . $this->getCheckBox('completebackup[conf][clearDb]', $this->conf['clearDb']) . ' clear DB <br />' . PHP_EOL . ' 
 				</fieldset>
 			</form>
 		';
