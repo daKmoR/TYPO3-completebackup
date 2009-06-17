@@ -6,6 +6,7 @@
 			'searchPath' => '',
 			'extractPath' => './',
 			'configFile' => 'typo3conf/hostconf.php',
+			'baseUrlFile' => 'fileadmin/templates/main/ts/constants.ts',
 			'override' => false
 		);
 		
@@ -258,6 +259,9 @@
 		.warning { background: #FEFF99; border: 1px solid #E3DC18; }
 		.error { background: #E18585; border: 1px solid #D4310A; }
 		.done { background: #E5E6E6; border: 1px solid #B0B0B0; }
+		
+		#newPassword { color: #094F9B; cursor: pointer; font-size: 12px;  }
+		#newPassword:hover { color: #FF0000; }
 	</style>
 </head>
 <body>
@@ -316,6 +320,42 @@
 						$msg = '[Database already found][check if you want to override]';
 					}
 					echo '<li class="' . $class . '"><input type="checkbox" name="deploySql" ' . $checked . ' /> Deploy the Database<sup><a href="#f2">2</a></sup>' . $msg . '</li>';
+					
+					// admin PW
+					$checked = ( isset($_REQUEST['changeAdminPw']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
+					$class = 'error'; $msg = '';
+					if( $sqlStatus == 'saveDeploy' || $sqlStatus == 'done' ) {
+						$class = 'ready';
+					} elseif( $sqlStatus == 'noConfig' ) {
+						$class = 'warning';
+						$msg = '[warning: noConfigFile]';
+					} elseif( $sqlStatus == 'noConfig' && $fileSystemStatus == 'alreadyDeployed' ) {
+						$class = 'error';
+						$msg = '[found: ' . $deploy->getSqlLink() . '][error: noConfigFile, but filesystem already deployed]';
+					} elseif( $sqlStatus == 'noConnection' ) {
+						$class = 'error'; $checked = '';
+						$msg = '[error: ' . mysql_error() . ']';
+					}
+					echo '<li class="' . $class . '"><input type="checkbox" name="changeAdminPw" ' . $checked . ' /> Change Admin Password to <input type="text" style="width: 100px;" name="adminPw" id="adminPwInput" /><span id="newPassword" onclick="newPassword();"> (random Password)</span>' . $msg . '</li>';
+					
+					// BaseUrl
+					$checked = ( isset($_REQUEST['updateDomain']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
+					$class = 'error'; $msg = '';
+					if( is_file($deploy->options->baseUrlFile) ) {
+						if( !is_writeable($deploy->options->baseUrlFile) ) {
+							$class = 'ready';
+						} else {
+							$class = 'error';
+							$msg = '[error: file not writeable]';
+						}
+					} elseif ($fileSystemStatus != 'alreadyDeployed') {
+						$class = 'warning';
+						$msg = '[warning: file not found]';
+					} else {
+						$class = 'error';
+						$msg = '[error: file not found, but filesystem already deployed]';
+					}
+					echo '<li class="' . $class . '"><input type="checkbox" name="updateDomain" ' . $checked . ' /> Update BaseUrl to <input type="text" style="width: 200px;" name="domain" /> <span style="font-size: 13px; color: #888;">(' . $deploy->options->baseUrlFile . ')</span>' . $msg . ' </li>';
 					
 					// DELETE FILES
 					$checked = ( isset($_REQUEST['deleteBackup']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
@@ -378,6 +418,7 @@
 		
 		configSql.style.display = 'block';
 		toggleDisplay();
+		newPassword();
 		
 		function toggleDisplay() {
 			if( configSql.style.display == 'block' ) {
@@ -387,6 +428,22 @@
 				configSql.style.display = 'block';
 				configSqlFieldset.style.padding = '10px';
 			}
+		}
+		
+		function randomPassword(length) {
+			var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+			var pass = '';
+			var i;
+			for( var x = 0; x < length; x++) {
+				i = Math.floor(Math.random() * 62);
+				pass += chars.charAt(i);
+			}
+			return pass;
+		}
+		
+		function newPassword() {
+			var input = document.getElementById('adminPwInput');
+			input.value = randomPassword(8);
 		}
 	</script>
 
