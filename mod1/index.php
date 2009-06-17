@@ -210,16 +210,24 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$files = $_REQUEST['completebackup']['files'];
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
-		// $myZip = new Tar( $this->conf['compressFileSystem'] );
-		$myZip = new Tar( false );
-		if( $myZip->open(PATH_site . $this->conf['backupPath'] . $name) ) {
+		$fileSystem = new Tar( $this->conf['compressFileSystem'] );
+		if( $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name) ) {
+		
 			foreach( $files as $file => $state ) {
 				if ( is_dir( PATH_site . $file) )
-					$myZip->addDir( PATH_site . $file, $file );
+					$fileSystem->addDir( PATH_site . $file, $file );
 				else
-					$myZip->addFile( PATH_site . $file, $file);
+					$fileSystem->addFile( PATH_site . $file, $file);
 			}
-			$myZip->close();
+			
+			$filesToRemove = glob( PATH_site . $this->conf['backupPath'] . '*' );
+			foreach ( $filesToRemove as $removeMe ) {
+				if( stripos($removeMe, 'index.html') === false ) {
+					$fileSystem->removeFile($removeMe);
+				}
+			}
+			
+			$fileSystem->close();
 			return true;
 		}
 		return false;
