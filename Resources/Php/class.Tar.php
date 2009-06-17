@@ -12,10 +12,12 @@ class Tar {
 	}
 	
 	function setGz( $gz ) {
-		if( isset($gz) && $gz ) {
-			$this->gz = true;
-		} else {
-			$this->gz = false;
+		if( isset($gz) ) {
+			if( $gz ) {
+				$this->gz = true;
+			} else {
+				$this->gz = false;
+			}
 		}
 	}
 	
@@ -32,6 +34,17 @@ class Tar {
 	function addFile( $path, $file = '') {
 		if ( is_file($path) ) {
 			$this->fileList[$file] = $path;
+			return true;
+		}
+		return false;
+	}
+	
+	function removeFile( $what ) {
+		if( isset($this->fileList[$what]) ) {
+			unset( $this->fileList[$what] );
+			return true;
+		} elseif( ($key = array_search($what, $this->fileList)) !== false ) {
+			unset( $this->fileList[$key] );
 			return true;
 		}
 		return false;
