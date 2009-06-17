@@ -77,7 +77,7 @@ class Tar {
 		if( $dir != '' && substr($dir, -1) != DIRECTORY_SEPARATOR ) {
 			$dir .= '/';
 		}
-		$this->cut = strlen( dirname(realpath($path)) ) + 1;
+		$this->cut = strlen( dirname($path) ) + 1;
 		
 		$this->_addDir($path, $dir);
 	}
