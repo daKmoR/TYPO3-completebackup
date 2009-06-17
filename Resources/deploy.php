@@ -13,6 +13,7 @@
 		var $fileSystem = false;
 		var $sql = false;
 		var $error = false;
+		var $updateAdminPwStatus = false;
 
 		public function Deployer($options = null) {
 			$this->setOptions($options);
@@ -44,6 +45,18 @@
 				}
 				
 			}
+			
+			if( isset($_REQUEST['updateAdminPw']) && $_REQUEST['updateAdminPw'] == 'on' ) {
+				if( isset($_REQUEST['adminPw']) && $_REQUEST['adminPw'] != '' ) {
+					if( $this->updateAdminPw($_REQUEST['adminPw']) ) {
+						$this->updateAdminPwStatus = 'done';
+					} else {
+						$this->error = 'Could not update admin password: ' . mysql_error(); 
+					}
+				} else {
+					$this->error = 'If you want to update the admin password you need to define one (no empty pw)';
+				}
+			}
 				
 			if( !$this->error && isset($_REQUEST['deleteBackup']) && $_REQUEST['deleteBackup'] == 'on' ) {
 				//$this->deleteBackup();
@@ -53,6 +66,25 @@
 				//$this->deleteDeploy();
 			}
 				
+		}
+		
+		public function updateAdminPw($password) {
+			require_once $this->options->extractPath . $this->options->configFile;
+			
+			if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
+				$this->error = 'Could not connect: ' . mysql_error();
+				return false;
+			}
+			if( !mysql_select_db($typo_db) ) {
+				$this->error = 'Could not create database: ' . mysql_error();
+				return false;
+			}
+			
+			return mysql_query('UPDATE `' . $typo_db . '`.`be_users` SET `password` = MD5( \'' . $password . '\' ) WHERE `be_users`.`uid` = 1 LIMIT 1;');
+		}
+		
+		public function getUpdateAdminPwStatus() {
+			return $this->updateAdminPwStatus;
 		}
 		
 		public function hasRequestSqlConfig() {
@@ -136,8 +168,8 @@
 				return false;
 			}
 			if( !mysql_select_db($typo_db) ) {
-				if( !mysql_query('CREATE DATABASE ' . $typo_db, $link) ) {
-					$this->error = 'Could not select database: ' . mysql_error();
+				if( !mysql_query('CREATE DATABASE `' . $typo_db . '`', $link) ) {
+					$this->error = 'Could not create database: ' . mysql_error();
 					return false;
 				} else {
 					mysql_select_db($typo_db);
@@ -235,7 +267,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-	<title>Deploy a TYPO3 Installation</title>
+	<title>Deploy a TYPO3 Backup</title>
 	
 	<style type="text/css">
 		body { font-family: 'Trebuchet MS', Arial; background: #efefef; }
@@ -336,13 +368,18 @@
 						$class = 'error'; $checked = '';
 						$msg = '[error: ' . mysql_error() . ']';
 					}
-					echo '<li class="' . $class . '"><input type="checkbox" name="changeAdminPw" ' . $checked . ' /> Change Admin Password to <input type="text" style="width: 100px;" name="adminPw" id="adminPwInput" /><span id="newPassword" onclick="newPassword();"> (random Password)</span>' . $msg . '</li>';
+					if( $deploy->getUpdateAdminPwStatus() == 'done' ) {
+						$class = 'done'; $checked = '';
+						$msg = '[password updated]';
+					}
+					$value = isset($_REQUEST['adminPw']) ? $_REQUEST['adminPw'] : '';
+					echo '<li class="' . $class . '"><input type="checkbox" name="updateAdminPw" ' . $checked . ' /> Change Admin Password to <input type="text" style="width: 100px;" name="adminPw" id="adminPwInput" value="' . $value . '" /><span id="newPassword" onclick="newPassword();"> (random Password)</span>' . $msg . '</li>';
 					
 					// BaseUrl
 					$checked = ( isset($_REQUEST['updateDomain']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
 					$class = 'error'; $msg = '';
 					if( is_file($deploy->options->baseUrlFile) ) {
-						if( !is_writeable($deploy->options->baseUrlFile) ) {
+						if( is_writeable($deploy->options->baseUrlFile) ) {
 							$class = 'ready';
 						} else {
 							$class = 'error';
@@ -418,7 +455,8 @@
 		
 		configSql.style.display = 'block';
 		toggleDisplay();
-		newPassword();
+		if( document.getElementById('adminPwInput').value == '' )
+			newPassword();
 		
 		function toggleDisplay() {
 			if( configSql.style.display == 'block' ) {
