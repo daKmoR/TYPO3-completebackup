@@ -108,38 +108,56 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$getConf = isset($_REQUEST['completebackup']['conf']) ? $_REQUEST['completebackup']['conf'] : array();
 		$this->conf['notifyServer'] = (isset($getConf['notifyServer']) && $getConf['notifyServer'] == 'on') ? 1 : 0;
 		$this->conf['deleteFilesByServer'] = (isset($getConf['deleteFilesByServer']) && $getConf['deleteFilesByServer'] == 'on') ? 1 : 0;
-		$this->conf['clearDb'] = (isset($getConf['clearDb']) && $getConf['clearDb'] == 'on') ? 1 : 0;
-		$this->conf['clearFileSystem'] = (isset($getConf['clearFileSystem']) && $getConf['clearFileSystem'] == 'on') ? 1 : 0;
-
+		$this->conf['cleanDb'] = (isset($getConf['cleanDb']) && $getConf['cleanDb'] == 'on') ? 1 : 0;
+		$this->conf['cleanFileSystem'] = (isset($getConf['cleanFileSystem']) && $getConf['cleanFileSystem'] == 'on') ? 1 : 0;
+		$this->conf['fileSystemBackup'] = (isset($getConf['fileSystemBackup']) && $getConf['fileSystemBackup'] == 'on') ? 1 : 0;
+		$this->conf['dataBaseBackup'] = (isset($getConf['dataBaseBackup']) && $getConf['dataBaseBackup'] == 'on') ? 1 : 0;
+		
 		$name = date('Y_m_d-Hm') . '_' . $this->conf['filename'];
-		$zipName = ($this->conf['compressFileSystem']) ? $name . '.tar.gz' : $name . '.tar';
+		$fileSystemName = ($this->conf['compressFileSystem']) ? $name . '.tar.gz' : $name . '.tar';
 		$sqlName = ($this->conf['compressDb']) ? $name . '.sql.gz' : $name . '.sql';
-		$this->createZip( $zipName );
-		//$this->createSql( $sqlName );
-		if ( $this->conf['notifyServer'] ) 
-			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $zipName, $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName );
-		
+
 		$content = '';
-		$content .= 'The Backupfiles: <br />';
-		$content .= '<a href="../' . $this->conf['backupPath'] . $zipName . '">' . $zipName . '</a><br />';
-		$content .= '<a href="../' . $this->conf['backupPath'] . $sqlName . '">' . $sqlName . '</a><br />';
-		$content .= 'are created.<br />';
+		$content .= '<h3>Backup Process Complete:</h3> <ul>';
+		if( $this->conf['cleanFileSystem'] ) {
+			if( $this->cleanFileSystem() ) {
+				$content .= '<li>The FileSystem got cleaned [removed typo3conf/*_CACHED_*][cleaned typo3temp]</li>';
+			}
+		}
+		if( $this->conf['fileSystemBackup'] ) {
+			if( $this->createFileSystemBackup($fileSystemName) ) {
+				$content .= '<li>The Backup for the FileSystem has been created [<a href="../' . $this->conf['backupPath'] . $fileSystemName . '">' . $fileSystemName . '</a>]</li>';
+			}
+		}
 		
-		if ( $this->conf['notifyServer'] && $this->conf['serverUrl'] != '' )
-			$content .= 'The Server (' . $this->conf['serverUrl'] . ') has been notified (It will fetch the backupfiles).<br />';
-		if ( $this->conf['deleteFilesByServer'] )
-			$content .= 'The Server will delete the BackupFiles afterward. (Status: ' . $serverStatus . ') ';
+		if( $this->conf['cleanDb'] ) {
+			if( $this->cleanDb() ) {
+				$content .= '<li>The Database got cleaned [following tables got truncated ' . print_r($this->conf['truncateTables'], 1) . ']</li>';
+			}
+		}
+		if( $this->conf['dataBaseBackup'] ) {
+			if( $this->createSqlBackup($sqlName) ) {
+				$content .= '<li>The Backup for the Database has been created [<a href="../' . $this->conf['backupPath'] . $sqlName . '">' . $sqlName . '</a>]</li>';
+			}
+		}
+		
+		if ( $this->conf['notifyServer'] && $this->conf['serverUrl'] != '' ) {
+			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $fileSystemName, $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName );
+			$content .= '<li>The Server (' . $this->conf['serverUrl'] . ') has been notified (It will fetch the backupfiles)</li>';
+			if ( $this->conf['deleteFilesByServer'] ) {
+				$content .= '<li>The Server will delete the BackupFiles afterward. (Status: ' . $serverStatus . ')</li>';
+			}
+		}
+		
+		$content .= '</ul>';
 		
 		return $content;
 	}
 	
-	function createSql($name) {
-		if( $this->conf['cleanDb'] )
-			$this->cleanDb();
-	
+	function createSqlBackup($name) {
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.MySQLDump.php';
 		$dumper = new MySQLDump( TYPO3_db, PATH_site . $this->conf['backupPath'] . $name, $this->conf['compressDb']);
-		$dumper->doDump();
+		return $dumper->doDump();
 	}
 	
 	function cleanDb() {
@@ -147,8 +165,10 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		if( t3lib_extMgm::isLoaded('realurl') )
 			$this->conf['truncateTables'] = array_merge( $this->conf['truncateTables'], array('tx_realurl_chashcache', 'tx_realurl_pathcache', 'tx_realurl_urldecodecache', 'tx_realurl_urlencodecache') );
 			
-		foreach( $this->conf['truncateTables'] as $table )
+		foreach( $this->conf['truncateTables'] as $table ) {
 			$GLOBALS['TYPO3_DB']->sql(TYPO3_db, 'TRUNCATE TABLE ' . $table );
+		}
+		return true;
 	}
 	
 	function cleanFileSystem() {
@@ -156,7 +176,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		foreach($files as $file)
 			@unlink( $file );
 		
-		$this->cleanDir(PATH_site . 'typo3temp/', true, false, false, array('.', '..', 'index.html') );
+		return $this->cleanDir(PATH_site . 'typo3temp/', true, false, false, array('.', '..', 'index.html') );
 	}
 	
 	/** 
@@ -189,8 +209,8 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		return $result;
 	}
 	
-	function notifyServer($zipPath, $sqlPath) {
-		$params = array('zip' => $zipPath, 'sql' => $sqlPath, 'service' => $this->getPageDIR() . '/../?eID=completebackup');
+	function notifyServer($fileSystemPath, $sqlPath) {
+		$params = array('zip' => $fileSystemPath, 'sql' => $sqlPath, 'service' => $this->getPageDIR() . '/../?eID=completebackup');
 		if( $this->conf['additionalInfo'] != '' )
 			$params['additionalInfo'] = $this->conf['additionalInfo'];
 		if( $this->conf['deleteFilesByServer'] )
@@ -203,16 +223,13 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		return file_get_contents( $url );
 	}
 	
-	function createZip($name) {
-		if( $this->conf['cleanFileSystem'] )
-			$this->cleanFileSystem();
-			
+	function createFileSystemBackup($name) {
 		$files = $_REQUEST['completebackup']['files'];
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
 		$fileSystem = new Tar( $this->conf['compressFileSystem'] );
 		if( $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name) ) {
-		
+
 			foreach( $files as $file => $state ) {
 				if ( is_dir( PATH_site . $file) )
 					$fileSystem->addDir( PATH_site . $file, $file );
@@ -227,8 +244,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 				}
 			}
 			
-			$fileSystem->close();
-			return true;
+			return $fileSystem->close();
 		}
 		return false;
 	}
@@ -264,8 +280,8 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 					' . $this->getCheckBox('completebackup[conf][dataBaseBackup]', $this->conf['dataBaseBackup']) . ' Create a Database Backup <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][notifyServer]', $this->conf['notifyServer']) . ' Notify Server [' . $this->conf['serverUrl'] . '] <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][deleteFilesByServer]', $this->conf['deleteFilesByServer']) . ' Delete the backupfiles after they have been fetched by the server (only works if Notify Server) <br />' . PHP_EOL . ' 
-					' . $this->getCheckBox('completebackup[conf][clearFileSystem]', $this->conf['clearFileSystem']) . ' clear File System <br />' . PHP_EOL . ' 
-					' . $this->getCheckBox('completebackup[conf][clearDb]', $this->conf['clearDb']) . ' clear DB <br />' . PHP_EOL . ' 
+					' . $this->getCheckBox('completebackup[conf][cleanFileSystem]', $this->conf['cleanFileSystem']) . ' clean the FileSystem <br />' . PHP_EOL . ' 
+					' . $this->getCheckBox('completebackup[conf][cleanDb]', $this->conf['cleanDb']) . ' clean the Database <br />' . PHP_EOL . ' 
 				</fieldset>
 			</form>
 		';
