@@ -197,11 +197,11 @@ class Tar {
 			
 		} // for(...)
 		if( $this->gz === true ) {
-			gzclose($this->tarFile);
+			return gzclose($this->tarFile);
 		} else {
-			fclose($this->tarFile);
+			return fclose($this->tarFile);
 		}
-		return true;
+		return false;
 	}
 	
 }
