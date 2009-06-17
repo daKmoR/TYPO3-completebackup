@@ -5,6 +5,7 @@ class Tar {
 	var $path = '';
 	var $gz = false;
 	var $tarFile;
+	var $cut = 0;
 	
 	function Tar( $gz = true ) {
 		$this->setGz( $gz );
@@ -28,32 +29,26 @@ class Tar {
 		return is_resource($this->tarFile);
 	}
 	
-	function addFile( $file, $path = '') {
-		if ( is_file($file) ) {
-			$this->fileList[$path] = $file;
+	function addFile( $path, $file = '') {
+		if ( is_file($path) ) {
+			$this->fileList[$file] = $path;
 			return true;
 		}
 		return false;
 	}
 	
-	function _addDir($_dir, $path = '', $depth = 3) {
-		if( file_exists($_dir) ) {
-			if( $path == '' ) {
-				$path = $_dir;
-			}
-			if( $path != '' && substr($path, -1) != '/' ) {
-				$path .= '/';
-			}
-			
-			$this->fileList[$path] = $_dir;
-			$d = dir($_dir);
+	function _addDir($path, $_dir = '', $depth = 3) {
+		if( file_exists($path) ) {
+			$this->fileList[$_dir] = $path;
+			$d = dir($path);
 			while (false !== ($dir = $d->read()) ) {
 				if( ( $dir != "." && $dir != ".." ) ) {
-					if ( is_dir($d->path . '/' . $dir) ) {
-						if ( $depth >= 1 )
-							$this->_addDir($d->path . '/' . $dir, $this->path . $d->path . '/' . $dir, $depth-1);
+					if ( is_dir($d->path . $dir) ) {
+						if ( $depth >= 1 ) {
+							$this->_addDir($d->path . $dir . '/', substr($d->path, $this->cut, strlen($d->path)) . $dir . '/', $depth-1);
+						}
 					} else {
-						$this->addFile( $d->path . '/' . $dir, $this->path . $d->path . '/' . $dir );
+						$this->addFile( $d->path . $dir, substr($d->path, $this->cut, strlen($d->path)) . $dir );
 					}
 				}
 			}
@@ -62,12 +57,16 @@ class Tar {
 		return false;
 	}
 	
-	function addDir($dir, $path = '') {
-		if( $path != '' && substr($path, -1) != '/' ) {
-				$path .= '/';
+	function addDir($path, $dir) {
+		if( $path != '' && substr($path, -1) != DIRECTORY_SEPARATOR ) {
+			$path .= '/';
+		}		
+		if( $dir != '' && substr($dir, -1) != DIRECTORY_SEPARATOR ) {
+			$dir .= '/';
 		}
-		$this->path = $path;
-		$this->_addDir($dir, $path);
+		$this->cut = strlen( dirname(realpath($path)) ) + 1;
+		
+		$this->_addDir($path, $dir);
 	}
 	
 	function add($pattern, $path) {
