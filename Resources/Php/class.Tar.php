@@ -6,8 +6,20 @@ class Tar {
 	var $gz = false;
 	var $tarFile;
 	
-	function open( $filename, $gz = false ) {
-		$this->gz = $gz;
+	function Tar( $gz = true ) {
+		$this->setGz( $gz );
+	}
+	
+	function setGz( $gz ) {
+		if( isset($gz) && $gz ) {
+			$this->gz = true;
+		} else {
+			$this->gz = false;
+		}
+	}
+	
+	function open( $filename, $gz = NULL ) {
+		$this->setGz( $gz );
 		if( $this->gz === true ) {
 			$this->tarFile = @gzopen($filename, 'w');
 		} else {
