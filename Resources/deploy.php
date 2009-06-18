@@ -279,15 +279,11 @@
 			return false;
 		}
 		
-		
-		
 	}
 	
 	$deploy = new Deployer();
 
-
 ?>
-
 
 <!DOCTYPE html
      PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
@@ -488,9 +484,6 @@
 	
 </div>
 
-
-
-
 	<script type="text/javascript">
 		var configSql = document.getElementById('configSql');
 		var configSqlFieldset = document.getElementById('configSqlFieldset');
@@ -511,7 +504,7 @@
 		}
 		
 		function randomPassword(length) {
-			var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+			var chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNOPQRSTUVWXYZ23456789';
 			var pass = '';
 			var i;
 			for( var x = 0; x < length; x++) {
@@ -529,7 +522,6 @@
 
 </body>
 </html>
-
 
 <?php
 /**
@@ -668,5 +660,5 @@ class Tar {
 	}
 	
 }
-	
+
 ?>
