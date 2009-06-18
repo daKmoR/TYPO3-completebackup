@@ -69,13 +69,13 @@
 			}
 				
 			if( !$this->error && isset($_REQUEST['deleteBackup']) && $_REQUEST['deleteBackup'] == 'on' ) {
-				//$this->deleteBackup();
+				$this->deleteBackup();
 			}
 
 			if( !$this->error && isset($_REQUEST['deleteDeploy']) && $_REQUEST['deleteDeploy'] == 'on' ) {
-				//$this->deleteDeploy();
+				$this->deleteDeploy();
 			}
-				
+			
 		}
 		
 		public function updateDomain($domain) {
