@@ -104,18 +104,11 @@ class Deployer extends Options {
 	}
 	
 	public function updateAdminPw($password) {
-		require_once $this->options->extractPath . $this->options->configFile;
-		
-		if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
-			$this->error = 'Could not connect: ' . mysql_error();
-			return false;
-		}
-		if( !mysql_select_db($typo_db) ) {
-			$this->error = 'Could not create database: ' . mysql_error();
-			return false;
+		if( !is_resource($this->link) ) {
+			$this->connect();
 		}
 		
-		return mysql_query('UPDATE `' . $typo_db . '`.`be_users` SET `password` = MD5( \'' . $password . '\' ) WHERE `be_users`.`uid` = 1 LIMIT 1;');
+		return mysql_query('UPDATE `be_users` SET `password` = MD5( \'' . $password . '\' ) WHERE `uid` = 1;', $this->link);
 	}
 	
 	public function getUpdateAdminPwStatus() {
@@ -134,13 +127,13 @@ class Deployer extends Options {
 	
 	public function getSqlStatus() {
 		if( is_file($this->options->extractPath . $this->options->configFile) ) {
-			require $this->options->extractPath . $this->options->configFile;
-			if( $link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
-				if( @mysql_select_db($typo_db) ) {
-					mysql_close($link);
+			if( !is_resource($this->link) ) {
+				$this->connect(false);
+			} 
+			if( is_resource($this->link) ) {
+				if( @mysql_select_db($typo_db, $this->link) ) {
 					return 'done';
 				}
-				mysql_close($link);
 				return 'saveDeploy';
 			} else {
 				return 'noConnection';
@@ -188,35 +181,48 @@ class Deployer extends Options {
 		}
 		
 		foreach( $queries as $query ) {
-			if( !mysql_query($query) ) {
+			if( !mysql_query($query, $this->link) ) {
 				return false;
 			}
 		}
 		return true;
 	}
 	
-	public function deploySql($sqlPath) {
+	public function connect($selectDb = true) {
 		require_once $this->options->extractPath . $this->options->configFile;
-		
-		if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
+		if( !$this->link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
 			$this->error = 'Could not connect: ' . mysql_error();
 			return false;
 		}
-		if( !mysql_select_db($typo_db) ) {
-			if( !mysql_query('CREATE DATABASE `' . $typo_db . '`', $link) ) {
-				$this->error = 'Could not create database: ' . mysql_error();
-				return false;
-			} else {
-				mysql_select_db($typo_db);
+		
+		if( $selectDb ) {
+			if( !mysql_select_db($typo_db, $this->link) ) {
+				if( !mysql_query('CREATE DATABASE `' . $typo_db . '`', $this->link) ) {
+					$this->error = 'Could not create database: ' . mysql_error();
+					return false;
+				} else {
+					return mysql_select_db($typo_db, $this->link);
+				}
 			}
 		}
 		
-		if( $this->mysqlBigImport($sqlPath) ) {
-			return true;
-		} else {
+		return true;
+	}
+	
+	public function disconnect() {
+		mysql_close($this->link);
+	}
+	
+	public function deploySql($sqlPath) {
+		if( !is_resource($this->link) ) {
+			$this->connect();
+		}
+		
+		if( !$this->mysqlBigImport($sqlPath) ) {
 			$this->error = 'sql could not be imported: ' . mysql_error();
 			return false;
 		}
+		return true;
 	}
 	
 	public function deployFileSystem($fileSystemPath) {
@@ -531,6 +537,8 @@ $deploy = new Deployer();
 </html>
 
 <?php
+$deploy->disconnect();
+
 /**
  * a simple class to use MooTools Style options in PHP
  *
