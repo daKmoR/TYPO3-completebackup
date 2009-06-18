@@ -1,287 +1,294 @@
 <?php
 
-	class Deployer extends Options {
+/**
+ * a deploy script for a tared fileSystem and a sql dump (support gz for both)
+ *
+ * @license MIT-style license
+ * @author Thomas Allmer <at@delusionworld.com>
+ * @copyright Copyright belongs to the respective authors
+ */ 
+class Deployer extends Options {
+
+	public $options = array(
+		'searchPath' => '',
+		'extractPath' => './',
+		'configFile' => 'typo3conf/hostconf.php',
+		'baseUrlFile' => 'fileadmin/templates/main/ts/constants.ts',
+		'override' => false
+	);
 	
-		public $options = array(
-			'searchPath' => '',
-			'extractPath' => './',
-			'configFile' => 'typo3conf/hostconf.php',
-			'baseUrlFile' => 'fileadmin/templates/main/ts/constants.ts',
-			'override' => false
-		);
-		
-		var $fileSystem = false;
-		var $sql = false;
-		var $error = false;
-		var $updateAdminPwStatus = false;
+	var $fileSystem = false;
+	var $sql = false;
+	var $error = false;
+	var $updateAdminPwStatus = false;
 
-		public function Deployer($options = null) {
-			$this->setOptions($options);
-			if( isset($_REQUEST['overrideConfig']) && $_REQUEST['overrideConfig'] == 'on' ) {
-				$this->options->override = true;
-			}
+	public function Deployer($options = null) {
+		$this->setOptions($options);
+		if( isset($_REQUEST['overrideConfig']) && $_REQUEST['overrideConfig'] == 'on' ) {
+			$this->options->override = true;
+		}
 
-			$this->fileSystem = glob($this->options->searchPath . '*.tar.gz*');
-			$this->sql = glob($this->options->searchPath . '*.sql*');
-			if( count($this->fileSystem) > 0 && count($this->sql) > 0 ) {
-				$this->fileSystem = $this->fileSystem[0];
-				$this->sql = $this->sql[0];
+		$this->fileSystem = glob($this->options->searchPath . '*.tar.gz*');
+		$this->sql = glob($this->options->searchPath . '*.sql*');
+		if( count($this->fileSystem) > 0 && count($this->sql) > 0 ) {
+			$this->fileSystem = $this->fileSystem[0];
+			$this->sql = $this->sql[0];
+		}
+		
+		if( isset($_REQUEST['deployFileSystem']) && $_REQUEST['deployFileSystem'] == 'on' && $this->fileSystem ) {
+			$this->deployFileSystem( $this->fileSystem );
+		}
+		
+		if( $this->hasRequestSqlConfig() && (!is_file($this->options->extractPath . $this->options->configFile) || $this->options->override) ) {
+			$this->saveConfigFile();
+		}
+		
+		if( isset($_REQUEST['deploySql']) && $_REQUEST['deploySql'] == 'on' ) {
+			
+			if ( is_file($this->options->extractPath . $this->options->configFile)  ) {
+				$this->deploySql( $this->sql );
+			}	else {
+				$this->error = 'No manual config provided and no config file found at ' . $this->options->extractPat . $this->options->configFile;
 			}
 			
-			if( isset($_REQUEST['deployFileSystem']) && $_REQUEST['deployFileSystem'] == 'on' && $this->fileSystem ) {
-				$this->deployFileSystem( $this->fileSystem );
-			}
-			
-			if( $this->hasRequestSqlConfig() && (!is_file($this->options->extractPath . $this->options->configFile) || $this->options->override) ) {
-				$this->saveConfigFile();
-			}
-			
-			if( isset($_REQUEST['deploySql']) && $_REQUEST['deploySql'] == 'on' ) {
-				
-				if ( is_file($this->options->extractPath . $this->options->configFile)  ) {
-					$this->deploySql( $this->sql );
-				}	else {
-					$this->error = 'No manual config provided and no config file found at ' . $this->options->extractPat . $this->options->configFile;
-				}
-				
-			}
-			
-			if( isset($_REQUEST['updateAdminPw']) && $_REQUEST['updateAdminPw'] == 'on' ) {
-				if( isset($_REQUEST['adminPw']) && $_REQUEST['adminPw'] != '' ) {
-					if( $this->updateAdminPw($_REQUEST['adminPw']) ) {
-						$this->updateAdminPwStatus = 'done';
-					} else {
-						$this->error = 'Could not update admin password: ' . mysql_error(); 
-					}
+		}
+		
+		if( isset($_REQUEST['updateAdminPw']) && $_REQUEST['updateAdminPw'] == 'on' ) {
+			if( isset($_REQUEST['adminPw']) && $_REQUEST['adminPw'] != '' ) {
+				if( $this->updateAdminPw($_REQUEST['adminPw']) ) {
+					$this->updateAdminPwStatus = 'done';
 				} else {
-					$this->error = 'If you want to update the admin password you need to define one (no empty pw)';
-				}
-			}
-			
-			if( isset($_REQUEST['updateDomain']) && $_REQUEST['updateDomain'] == 'on' ) {
-				if( isset($_REQUEST['domain']) && $_REQUEST['domain'] != '' ) {
-					if( !$this->updateDomain($_REQUEST['domain']) ) {
-						$this->error = 'Could not update domain'; 
-					}
-				} else {
-					$this->error = 'If you want to update the domain you need to define one (can not be empty)';
-				}
-			}
-				
-			if( !$this->error && isset($_REQUEST['deleteBackup']) && $_REQUEST['deleteBackup'] == 'on' ) {
-				$this->deleteBackup();
-			}
-
-			if( !$this->error && isset($_REQUEST['deleteDeploy']) && $_REQUEST['deleteDeploy'] == 'on' ) {
-				$this->deleteDeploy();
-			}
-			
-		}
-		
-		public function updateDomain($domain) {
-			$buffer = array();
-			$handle = @fopen($this->options->extractPath . $this->options->baseUrlFile, 'r');
-			if ($handle) {
-				while (!feof($handle)) {
-					$buffer[] = fgets($handle, 4096);
-				}
-				fclose($handle);
-				foreach( $buffer as $key => $line ) {
-					if( stripos($line, 'baseUrl') !== false ) {
-						$buffer[$key] = 'baseUrl = ' . $domain . PHP_EOL;
-						return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
-					}
-				}
-			}
-			return false;
-		}
-		
-		public function updateAdminPw($password) {
-			require_once $this->options->extractPath . $this->options->configFile;
-			
-			if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
-				$this->error = 'Could not connect: ' . mysql_error();
-				return false;
-			}
-			if( !mysql_select_db($typo_db) ) {
-				$this->error = 'Could not create database: ' . mysql_error();
-				return false;
-			}
-			
-			return mysql_query('UPDATE `' . $typo_db . '`.`be_users` SET `password` = MD5( \'' . $password . '\' ) WHERE `be_users`.`uid` = 1 LIMIT 1;');
-		}
-		
-		public function getUpdateAdminPwStatus() {
-			return $this->updateAdminPwStatus;
-		}
-		
-		public function hasRequestSqlConfig() {
-			if( isset($_REQUEST['typo_db_username']) && $_REQUEST['typo_db_username'] != '' &&
-				  isset($_REQUEST['typo_db_password']) &&
-					isset($_REQUEST['typo_db_host']) && $_REQUEST['typo_db_host'] != '' &&
-					isset($_REQUEST['typo_db']) && $_REQUEST['typo_db'] != '' ) {
-				return true;
-			}
-			return false;
-		}
-		
-		public function getSqlStatus() {
-			if( is_file($this->options->extractPath . $this->options->configFile) ) {
-				require $this->options->extractPath . $this->options->configFile;
-				if( $link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
-					if( @mysql_select_db($typo_db) ) {
-						mysql_close($link);
-						return 'done';
-					}
-					mysql_close($link);
-					return 'saveDeploy';
-				} else {
-					return 'noConnection';
-				}
-			}
-			if( !is_file($this->sql) ) {
-				return 'noBackupFile';
-			}
-			return 'noConfig';
-		}
-		
-		public function saveConfigFile() {
-			if( is_file($this->options->extractPath . $this->options->configFile) && !$this->options->override ) {
-				$this->error = 'Config File (' . $this->options->extractPath . $this->options->configFile . ') exists you need to select override if you want to replace it';
-				return false;
-			}
-			$config  = '<?php' . PHP_EOL;
-			$config .= '  $typo_db_username = \'' . $_REQUEST['typo_db_username'] . '\';' . PHP_EOL;
-			$config .= '  $typo_db_password = \'' . $_REQUEST['typo_db_password'] . '\';' . PHP_EOL;
-			$config .= '  $typo_db_host = \'' . $_REQUEST['typo_db_host'] . '\';' . PHP_EOL;
-			$config .= '  $typo_db = \'' . $_REQUEST['typo_db'] . '\';' . PHP_EOL;
-			$config .= '?>' . PHP_EOL;
-			if( $size = @file_put_contents( $this->options->extractPath . $this->options->configFile, $config ) ) {
-				return $size;
-			} else {
-				$this->error = 'Could not write Config File; The folders are there right?';
-				return false;
-			}
-		}
-		
-		function mysqlBigImport( $sqlPath ) {
-			$handle = gzopen($sqlPath, 'r');
-			$queries = array();
-			$buffer = '';
-			while (!gzeof($handle)) {
-				$line = gzgets($handle, 100000);
-				$line = trim($line);
-				if( !ereg('^--', $line) && !$line == '' ) {
-					$buffer .= ($buffer != '') ? ' ' . $line : $line;
-					if( substr($line, -1) == ';' ) {
-						$queries[] .= $buffer;
-						$buffer = '';
-					}
-				}
-			}
-			
-			foreach( $queries as $query ) {
-				if( !mysql_query($query) ) {
-					return false;
-				}
-			}
-			return true;
-		}
-		
-		public function deploySql($sqlPath) {
-			require_once $this->options->extractPath . $this->options->configFile;
-			
-			if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
-				$this->error = 'Could not connect: ' . mysql_error();
-				return false;
-			}
-			if( !mysql_select_db($typo_db) ) {
-				if( !mysql_query('CREATE DATABASE `' . $typo_db . '`', $link) ) {
-					$this->error = 'Could not create database: ' . mysql_error();
-					return false;
-				} else {
-					mysql_select_db($typo_db);
-				}
-			}
-			
-			if( $this->mysqlBigImport($sqlPath) ) {
-				return true;
-			} else {
-				$this->error = 'sql could not be imported: ' . mysql_error();
-				return false;
-			}
-		}
-		
-		public function deployFileSystem($fileSystemPath) {
-			if( Tar::extract($fileSystemPath, $this->options->extractPath) ) {
-				return true;
-			}
-			$this->error = 'Could not deploy the FileSystem';
-			return false;
-		}
-		
-		public function deleteDeploy() {
-			unlink(__FILE__);
-		}		
-		
-		public function deleteBackup() {
-			unlink($this->fileSystem);
-			unlink($this->sql);
-		}
-		
-		public function getSqlLink() {
-			return $this->getLink($this->sql);
-		}		
-		
-		public function getZipLink() {
-			return $this->getLink($this->fileSystem);
-		}
-		
-		public function getLink($name, $link = null) {
-			$link = isset($link) ? $link : $name;
-			return '<a href="' . $link . '">' . $name . '</a>';
-		}
-		
-		public function getFileSystemStatus() {
-			if( !$this->hasAllTypo3RootFiles() ) {
-				if( !$this->hasAnyTypo3RootFile() && is_writable($this->options->extractPath) && is_file($this->fileSystem) ) {
-					return 'saveDeploy';
-				} elseif( $this->hasAnyTypo3RootFile() && is_writable($this->options->extractPath) && is_file($this->fileSystem) ) {
-					return 'overrideDeploy';
-				} elseif( !is_file($this->fileSystem) ) {
-					return 'noBackupFile';
-				} elseif( !is_writable($this->options->extractPath) ) {
-					return 'directoryNotWriteable';
+					$this->error = 'Could not update admin password: ' . mysql_error(); 
 				}
 			} else {
-				return 'alreadyDeployed';
+				$this->error = 'If you want to update the admin password you need to define one (no empty pw)';
 			}
-			return false;
 		}
 		
-		private function hasAnyTypo3RootFile() {
-			if( is_dir($this->options->extractPath . 'typo3conf') || is_dir($this->options->extractPath . 't3lib') 
-				|| is_dir($this->options->extractPath . 'typo3') || is_dir($this->options->extractPath . 'fileadmin')
-				|| is_dir($this->options->extractPath . 'typo3temp') || is_dir($this->options->extractPath . 'uploads')
-				|| is_file($this->options->extractPath . 'index.php') || is_file($this->options->extractPath . '.htaccess') || is_file($this->options->extractPath . 'clear.gif') ) {
-				  return true;
+		if( isset($_REQUEST['updateDomain']) && $_REQUEST['updateDomain'] == 'on' ) {
+			if( isset($_REQUEST['domain']) && $_REQUEST['domain'] != '' ) {
+				if( !$this->updateDomain($_REQUEST['domain']) ) {
+					$this->error = 'Could not update domain'; 
+				}
+			} else {
+				$this->error = 'If you want to update the domain you need to define one (can not be empty)';
 			}
-			return false;
+		}
+			
+		if( !$this->error && isset($_REQUEST['deleteBackup']) && $_REQUEST['deleteBackup'] == 'on' ) {
+			$this->deleteBackup();
 		}
 
-		private function hasAllTypo3RootFiles() {
-			if( is_dir($this->options->extractPath . 'typo3conf') && is_dir($this->options->extractPath . 't3lib') 
-				&& is_dir($this->options->extractPath . 'typo3') && is_dir($this->options->extractPath . 'fileadmin')
-				&& is_dir($this->options->extractPath . 'typo3temp') && is_dir($this->options->extractPath . 'uploads')
-				&& is_file($this->options->extractPath . 'index.php') && is_file($this->options->extractPath . '.htaccess') && is_file($this->options->extractPath . 'clear.gif') ) {
-				  return true;
-			}
-			return false;
+		if( !$this->error && isset($_REQUEST['deleteDeploy']) && $_REQUEST['deleteDeploy'] == 'on' ) {
+			$this->deleteDeploy();
 		}
 		
 	}
 	
-	$deploy = new Deployer();
+	public function updateDomain($domain) {
+		$buffer = array();
+		$handle = @fopen($this->options->extractPath . $this->options->baseUrlFile, 'r');
+		if ($handle) {
+			while (!feof($handle)) {
+				$buffer[] = fgets($handle, 4096);
+			}
+			fclose($handle);
+			foreach( $buffer as $key => $line ) {
+				if( stripos($line, 'baseUrl') !== false ) {
+					$buffer[$key] = 'baseUrl = ' . $domain . PHP_EOL;
+					return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
+				}
+			}
+		}
+		return false;
+	}
+	
+	public function updateAdminPw($password) {
+		require_once $this->options->extractPath . $this->options->configFile;
+		
+		if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
+			$this->error = 'Could not connect: ' . mysql_error();
+			return false;
+		}
+		if( !mysql_select_db($typo_db) ) {
+			$this->error = 'Could not create database: ' . mysql_error();
+			return false;
+		}
+		
+		return mysql_query('UPDATE `' . $typo_db . '`.`be_users` SET `password` = MD5( \'' . $password . '\' ) WHERE `be_users`.`uid` = 1 LIMIT 1;');
+	}
+	
+	public function getUpdateAdminPwStatus() {
+		return $this->updateAdminPwStatus;
+	}
+	
+	public function hasRequestSqlConfig() {
+		if( isset($_REQUEST['typo_db_username']) && $_REQUEST['typo_db_username'] != '' &&
+				isset($_REQUEST['typo_db_password']) &&
+				isset($_REQUEST['typo_db_host']) && $_REQUEST['typo_db_host'] != '' &&
+				isset($_REQUEST['typo_db']) && $_REQUEST['typo_db'] != '' ) {
+			return true;
+		}
+		return false;
+	}
+	
+	public function getSqlStatus() {
+		if( is_file($this->options->extractPath . $this->options->configFile) ) {
+			require $this->options->extractPath . $this->options->configFile;
+			if( $link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
+				if( @mysql_select_db($typo_db) ) {
+					mysql_close($link);
+					return 'done';
+				}
+				mysql_close($link);
+				return 'saveDeploy';
+			} else {
+				return 'noConnection';
+			}
+		}
+		if( !is_file($this->sql) ) {
+			return 'noBackupFile';
+		}
+		return 'noConfig';
+	}
+	
+	public function saveConfigFile() {
+		if( is_file($this->options->extractPath . $this->options->configFile) && !$this->options->override ) {
+			$this->error = 'Config File (' . $this->options->extractPath . $this->options->configFile . ') exists you need to select override if you want to replace it';
+			return false;
+		}
+		$config  = '<?php' . PHP_EOL;
+		$config .= '  $typo_db_username = \'' . $_REQUEST['typo_db_username'] . '\';' . PHP_EOL;
+		$config .= '  $typo_db_password = \'' . $_REQUEST['typo_db_password'] . '\';' . PHP_EOL;
+		$config .= '  $typo_db_host = \'' . $_REQUEST['typo_db_host'] . '\';' . PHP_EOL;
+		$config .= '  $typo_db = \'' . $_REQUEST['typo_db'] . '\';' . PHP_EOL;
+		$config .= '?>' . PHP_EOL;
+		if( $size = @file_put_contents( $this->options->extractPath . $this->options->configFile, $config ) ) {
+			return $size;
+		} else {
+			$this->error = 'Could not write Config File; The folders are there right?';
+			return false;
+		}
+	}
+	
+	function mysqlBigImport( $sqlPath ) {
+		$handle = gzopen($sqlPath, 'r');
+		$queries = array();
+		$buffer = '';
+		while (!gzeof($handle)) {
+			$line = gzgets($handle, 100000);
+			$line = trim($line);
+			if( !ereg('^--', $line) && !$line == '' ) {
+				$buffer .= ($buffer != '') ? ' ' . $line : $line;
+				if( substr($line, -1) == ';' ) {
+					$queries[] .= $buffer;
+					$buffer = '';
+				}
+			}
+		}
+		
+		foreach( $queries as $query ) {
+			if( !mysql_query($query) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public function deploySql($sqlPath) {
+		require_once $this->options->extractPath . $this->options->configFile;
+		
+		if( !$link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
+			$this->error = 'Could not connect: ' . mysql_error();
+			return false;
+		}
+		if( !mysql_select_db($typo_db) ) {
+			if( !mysql_query('CREATE DATABASE `' . $typo_db . '`', $link) ) {
+				$this->error = 'Could not create database: ' . mysql_error();
+				return false;
+			} else {
+				mysql_select_db($typo_db);
+			}
+		}
+		
+		if( $this->mysqlBigImport($sqlPath) ) {
+			return true;
+		} else {
+			$this->error = 'sql could not be imported: ' . mysql_error();
+			return false;
+		}
+	}
+	
+	public function deployFileSystem($fileSystemPath) {
+		if( Tar::extract($fileSystemPath, $this->options->extractPath) ) {
+			return true;
+		}
+		$this->error = 'Could not deploy the FileSystem';
+		return false;
+	}
+	
+	public function deleteDeploy() {
+		unlink(__FILE__);
+	}		
+	
+	public function deleteBackup() {
+		unlink($this->fileSystem);
+		unlink($this->sql);
+	}
+	
+	public function getSqlLink() {
+		return $this->getLink($this->sql);
+	}		
+	
+	public function getZipLink() {
+		return $this->getLink($this->fileSystem);
+	}
+	
+	public function getLink($name, $link = null) {
+		$link = isset($link) ? $link : $name;
+		return '<a href="' . $link . '">' . $name . '</a>';
+	}
+	
+	public function getFileSystemStatus() {
+		if( !$this->hasAllTypo3RootFiles() ) {
+			if( !$this->hasAnyTypo3RootFile() && is_writable($this->options->extractPath) && is_file($this->fileSystem) ) {
+				return 'saveDeploy';
+			} elseif( $this->hasAnyTypo3RootFile() && is_writable($this->options->extractPath) && is_file($this->fileSystem) ) {
+				return 'overrideDeploy';
+			} elseif( !is_file($this->fileSystem) ) {
+				return 'noBackupFile';
+			} elseif( !is_writable($this->options->extractPath) ) {
+				return 'directoryNotWriteable';
+			}
+		} else {
+			return 'alreadyDeployed';
+		}
+		return false;
+	}
+	
+	private function hasAnyTypo3RootFile() {
+		if( is_dir($this->options->extractPath . 'typo3conf') || is_dir($this->options->extractPath . 't3lib') 
+			|| is_dir($this->options->extractPath . 'typo3') || is_dir($this->options->extractPath . 'fileadmin')
+			|| is_dir($this->options->extractPath . 'typo3temp') || is_dir($this->options->extractPath . 'uploads')
+			|| is_file($this->options->extractPath . 'index.php') || is_file($this->options->extractPath . '.htaccess') || is_file($this->options->extractPath . 'clear.gif') ) {
+				return true;
+		}
+		return false;
+	}
+
+	private function hasAllTypo3RootFiles() {
+		if( is_dir($this->options->extractPath . 'typo3conf') && is_dir($this->options->extractPath . 't3lib') 
+			&& is_dir($this->options->extractPath . 'typo3') && is_dir($this->options->extractPath . 'fileadmin')
+			&& is_dir($this->options->extractPath . 'typo3temp') && is_dir($this->options->extractPath . 'uploads')
+			&& is_file($this->options->extractPath . 'index.php') && is_file($this->options->extractPath . '.htaccess') && is_file($this->options->extractPath . 'clear.gif') ) {
+				return true;
+		}
+		return false;
+	}
+	
+}
+
+$deploy = new Deployer();
 
 ?>
 
