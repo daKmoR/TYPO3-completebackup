@@ -211,7 +211,10 @@ class Deployer extends Options {
 	}
 	
 	public function disconnect() {
-		mysql_close($this->link);
+		if( is_resource( $this->link ) ) {
+			return mysql_close($this->link);
+		}
+		return false;
 	}
 	
 	public function deploySql($sqlPath) {
@@ -443,6 +446,7 @@ $deploy = new Deployer();
 						}
 					} elseif ($fileSystemStatus != 'alreadyDeployed') {
 						$class = 'warning';
+						$value = Helper::getPageDIR() . '/';
 						$msg = '[warning: file not found]';
 					} else {
 						$class = 'error';
@@ -543,6 +547,22 @@ $deploy = new Deployer();
 
 <?php
 $deploy->disconnect();
+
+class Helper {
+
+	public static function getPageDIR() {
+		$pageURL = 'http';
+		if ($_SERVER['HTTPS'] == 'on')
+			$pageURL .= 's';
+		$pageURL .= '://';
+		if ($_SERVER['SERVER_PORT'] != '80')
+			$pageURL .= $_SERVER['SERVER_NAME'] . ':' . $_SERVER['SERVER_PORT'] . dirname($_SERVER['SCRIPT_NAME']);
+		else
+			$pageURL .= $_SERVER['SERVER_NAME'] . dirname($_SERVER['SCRIPT_NAME']);
+		return $pageURL;
+	}
+	
+}
 
 /**
  * a simple class to use MooTools Style options in PHP
