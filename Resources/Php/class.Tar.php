@@ -50,7 +50,7 @@ class Tar {
 		return false;
 	}
 	
-	function _addDir($path, $_dir = '', $depth = 3) {
+	function _addDir($path, $_dir = '', $depth = 10) {
 		if( file_exists($path) ) {
 			$this->fileList[$_dir] = $path;
 			$d = dir($path);
