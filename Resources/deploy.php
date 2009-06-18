@@ -221,12 +221,15 @@ class Deployer extends Options {
 		if( !is_resource($this->link) ) {
 			$this->connect();
 		}
-		
-		if( !$this->mysqlBigImport($sqlPath) ) {
-			$this->error = 'sql could not be imported: ' . mysql_error();
-			return false;
+		if( is_resource($this->link) ) {
+			if( !$this->mysqlBigImport($sqlPath) ) {
+				$this->error = 'sql could not be imported: ' . mysql_error();
+				return false;
+			}
+			return true;
 		}
-		return true;
+		$this->error = 'no connection: ' . mysql_error();
+		return false;
 	}
 	
 	public function deployFileSystem($fileSystemPath) {
