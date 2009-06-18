@@ -57,6 +57,16 @@
 					$this->error = 'If you want to update the admin password you need to define one (no empty pw)';
 				}
 			}
+			
+			if( isset($_REQUEST['updateDomain']) && $_REQUEST['updateDomain'] == 'on' ) {
+				if( isset($_REQUEST['domain']) && $_REQUEST['domain'] != '' ) {
+					if( !$this->updateDomain($_REQUEST['domain']) ) {
+						$this->error = 'Could not update domain'; 
+					}
+				} else {
+					$this->error = 'If you want to update the domain you need to define one (can not be empty)';
+				}
+			}
 				
 			if( !$this->error && isset($_REQUEST['deleteBackup']) && $_REQUEST['deleteBackup'] == 'on' ) {
 				//$this->deleteBackup();
@@ -66,6 +76,24 @@
 				//$this->deleteDeploy();
 			}
 				
+		}
+		
+		public function updateDomain($domain) {
+			$buffer = array();
+			$handle = @fopen($this->options->extractPath . $this->options->baseUrlFile, 'r');
+			if ($handle) {
+				while (!feof($handle)) {
+					$buffer[] = fgets($handle, 4096);
+				}
+				fclose($handle);
+				foreach( $buffer as $key => $line ) {
+					if( stripos($line, 'baseUrl') !== false ) {
+						$buffer[$key] = 'baseUrl = ' . $domain . PHP_EOL;
+						return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
+					}
+				}
+			}
+			return false;
 		}
 		
 		public function updateAdminPw($password) {
@@ -378,12 +406,26 @@
 					// BaseUrl
 					$checked = ( isset($_REQUEST['updateDomain']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
 					$class = 'error'; $msg = '';
-					if( is_file($deploy->options->baseUrlFile) ) {
-						if( is_writeable($deploy->options->baseUrlFile) ) {
-							$class = 'ready';
+					$value = isset($_REQUEST['domain']) ? $_REQUEST['domain'] : '';
+					if( is_file($deploy->options->extractPath . $deploy->options->baseUrlFile) ) {
+						if( $buffer = file_get_contents($deploy->options->extractPath . $deploy->options->baseUrlFile) ) {
+							preg_match_all("#baseUrl\s*=\s*(.+)#", $buffer, $out, PREG_PATTERN_ORDER);
+							if( trim($out[1][0]) == trim($value) ) {
+								$class = 'done';
+								$checked = '';
+								$msg = '[domain updated]';
+							} elseif( is_writeable($deploy->options->extractPath . $deploy->options->baseUrlFile) ) {
+								$class = 'ready';
+								if( $value == '' ) {
+									$value = $out[1][0];
+								}
+							} else {
+								$class = 'error';
+								$msg = '[error: file not writeable]';
+							}
 						} else {
 							$class = 'error';
-							$msg = '[error: file not writeable]';
+							$msg = '[error: could not open file]';
 						}
 					} elseif ($fileSystemStatus != 'alreadyDeployed') {
 						$class = 'warning';
@@ -392,7 +434,7 @@
 						$class = 'error';
 						$msg = '[error: file not found, but filesystem already deployed]';
 					}
-					echo '<li class="' . $class . '"><input type="checkbox" name="updateDomain" ' . $checked . ' /> Update BaseUrl to <input type="text" style="width: 200px;" name="domain" /> <span style="font-size: 13px; color: #888;">(' . $deploy->options->baseUrlFile . ')</span>' . $msg . ' </li>';
+					echo '<li class="' . $class . '"><input type="checkbox" name="updateDomain" ' . $checked . ' /> Update BaseUrl to <input type="text" style="width: 200px;" name="domain" value="' . $value . '" /> <span style="font-size: 13px; color: #888;">(' . $deploy->options->baseUrlFile . ')</span>' . $msg . ' </li>';
 					
 					// DELETE FILES
 					$checked = ( isset($_REQUEST['deleteBackup']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
