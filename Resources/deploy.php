@@ -41,7 +41,7 @@
 				if ( is_file($this->options->extractPath . $this->options->configFile)  ) {
 					$this->deploySql( $this->sql );
 				}	else {
-					$this->error = 'No manual config provided and no config file found at ' . $this->options->configFile;
+					$this->error = 'No manual config provided and no config file found at ' . $this->options->extractPat . $this->options->configFile;
 				}
 				
 			}
@@ -126,7 +126,7 @@
 		}
 		
 		public function getSqlStatus() {
-			if( is_file($this->options->configFile) ) {
+			if( is_file($this->options->extractPath . $this->options->configFile) ) {
 				require $this->options->extractPath . $this->options->configFile;
 				if( $link = @mysql_connect($typo_db_host, $typo_db_username, $typo_db_password) ) {
 					if( @mysql_select_db($typo_db) ) {
@@ -146,8 +146,8 @@
 		}
 		
 		public function saveConfigFile() {
-			if( is_file($path) && !$this->options->override ) {
-				$this->error = 'Config File (' . $this->options->configFile . ') exists you need to select override if you want to replace it';
+			if( is_file($this->options->extractPath . $this->options->configFile) && !$this->options->override ) {
+				$this->error = 'Config File (' . $this->options->extractPath . $this->options->configFile . ') exists you need to select override if you want to replace it';
 				return false;
 			}
 			$config  = '<?php' . PHP_EOL;
@@ -156,7 +156,7 @@
 			$config .= '  $typo_db_host = \'' . $_REQUEST['typo_db_host'] . '\';' . PHP_EOL;
 			$config .= '  $typo_db = \'' . $_REQUEST['typo_db'] . '\';' . PHP_EOL;
 			$config .= '?>' . PHP_EOL;
-			if( $size = @file_put_contents( $this->options->configFile, $config ) ) {
+			if( $size = @file_put_contents( $this->options->extractPath . $this->options->configFile, $config ) ) {
 				return $size;
 			} else {
 				$this->error = 'Could not write Config File; The folders are there right?';
@@ -466,7 +466,7 @@
 		<fieldset id="configSqlFieldset">
 			<legend onclick="toggleDisplay();">Manual Sql Configuration</legend>
 			<div id="configSql">
-				<label for="overrideConfig">Override:</label> <input type="checkbox" name="overrideConfig" id="overrideConfig" /> Do you want to override a found config file (<?php echo $deploy->options->configFile; ?>)? <br />
+				<label for="overrideConfig">Override:</label> <input type="checkbox" name="overrideConfig" id="overrideConfig" /> Do you want to override a found config file (<?php echo $deploy->options->extactPath . $deploy->options->configFile; ?>)? <br />
 				<label for="typo_db_username">Username:</label> <input type="text" name="typo_db_username" id="typo_db_username" /> <br />
 				<label for="typo_db_password">Password:</label> <input type="text" name="typo_db_password" id="typo_db_password" /> <br />
 				<label for="typo_db_host">Host:</label> <input type="text" name="typo_db_host" id="typo_db_host" /> <br />
@@ -479,7 +479,7 @@
 	<div id="legend">
 		<ol>
 			<li id="f1">Extract the files</li>
-			<li id="f2">Needs the config file (<?php echo $deploy->options->configFile; ?>) from the FileSystem or a Manual Sql Configuration on this page</li>
+			<li id="f2">Needs the config file (<?php echo $deploy->options->extactPath . $deploy->options->configFile; ?>) from the FileSystem or a Manual Sql Configuration on this page</li>
 			<li id="f3">Filename deploy.php</li>
 			<li id="f4">They will be overwritten</li>
 			<li id="f5">If you still select it, it will be completely overwritten</li>
