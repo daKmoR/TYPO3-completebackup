@@ -325,7 +325,7 @@ $deploy = new Deployer();
 		fieldset { border: 1px solid #ccc; padding: 3px; margin: 20px; }
 		legend { cursor: pointer; margin: 0 15px }
 		label { width: 90px; display: block; float: left; }
-		input { border: 1px solid #ccc;s }
+		input { border: 1px solid #ccc; }
 		
 		#legend { font-size: 11px; color: #666; position: absolute; bottom: 0; border-top: 1px solid #ccc; width: 960px; margin: 0 auto; }
 		#actions ul { list-style-type: none; margin: 0; padding: 0; }
