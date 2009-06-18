@@ -129,8 +129,9 @@ class Deployer extends Options {
 		if( is_file($this->options->extractPath . $this->options->configFile) ) {
 			if( !is_resource($this->link) ) {
 				$this->connect(false);
-			} 
+			}
 			if( is_resource($this->link) ) {
+				require $this->options->extractPath . $this->options->configFile;
 				if( @mysql_select_db($typo_db, $this->link) ) {
 					return 'done';
 				}
@@ -420,9 +421,13 @@ $deploy = new Deployer();
 						if( $buffer = file_get_contents($deploy->options->extractPath . $deploy->options->baseUrlFile) ) {
 							preg_match_all("#baseUrl\s*=\s*(.+)#", $buffer, $out, PREG_PATTERN_ORDER);
 							if( trim($out[1][0]) == trim($value) ) {
-								$class = 'done';
-								$checked = '';
-								$msg = '[domain updated]';
+								if( isset($_REQUEST['updateDomain']) && $_REQUEST['updateDomain'] == 'on' ) {
+									$class = 'done';
+									$checked = '';
+									$msg = '[domain updated]';
+								} else {
+									$class = 'ready';
+								}
 							} elseif( is_writeable($deploy->options->extractPath . $deploy->options->baseUrlFile) ) {
 								$class = 'ready';
 								if( $value == '' ) {
@@ -443,7 +448,7 @@ $deploy = new Deployer();
 						$class = 'error';
 						$msg = '[error: file not found, but filesystem already deployed]';
 					}
-					echo '<li class="' . $class . '"><input type="checkbox" name="updateDomain" ' . $checked . ' /> Update BaseUrl to <input type="text" style="width: 200px;" name="domain" value="' . $value . '" /> <span style="font-size: 13px; color: #888;">(' . $deploy->options->baseUrlFile . ')</span>' . $msg . ' </li>';
+					echo '<li class="' . $class . '"><input type="checkbox" name="updateDomain" ' . $checked . ' /> Update BaseUrl to <input type="text" style="width: 300px;" name="domain" value="' . $value . '" /> <span style="font-size: 13px; color: #888;">(' . $deploy->options->baseUrlFile . ')</span>' . $msg . ' </li>';
 					
 					// DELETE FILES
 					$checked = ( isset($_REQUEST['deleteBackup']) || !isset($_REQUEST['submitted']) ) ? 'checked="checked"' : '';
