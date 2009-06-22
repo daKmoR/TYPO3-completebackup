@@ -95,7 +95,7 @@ class Deployer extends Options {
 			fclose($handle);
 			foreach( $buffer as $key => $line ) {
 				if( stripos($line, 'baseUrl') !== false ) {
-					$buffer[$key] = 'baseUrl = ' . $domain . PHP_EOL;
+					$buffer[$key+1] = 'baseUrl = ' . $domain . PHP_EOL;
 					return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
 				}
 			}
