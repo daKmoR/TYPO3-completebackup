@@ -51,6 +51,14 @@ class MySQLDump {
 	* @access private
 	*/
 	var $isWritten = false;
+	
+	var $header = 'SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+
+';
 
 	/**
 	* Class constructor
@@ -271,6 +279,7 @@ class MySQLDump {
 	*/
 	function doDump() {
 		$this->saveToFile($this->file,"SET FOREIGN_KEY_CHECKS = 0;\n\n");
+		$this->saveToFile($this->file, $this->header);
 		$this->getDatabaseStructure();
 		$this->getDatabaseData($this->hexValue);
 		$this->saveToFile($this->file,"SET FOREIGN_KEY_CHECKS = 1;\n\n");
