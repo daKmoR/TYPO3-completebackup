@@ -232,10 +232,14 @@ class Deployer extends Options {
 		return false;
 	}
 	
-	public function deployFileSystem($fileSystemPath) {
-		if( Tar::extract($fileSystemPath, $this->options->extractPath) ) {
-			return true;
+	public function deployFileSystem($fileSystemPath, $offset = 0) {
+		$offset = Tar::extract($fileSystemPath, $this->options->extractPath, 0777, $offset);
+		if( is_int($offset) ) {
+			return $offset;
+		} else if( $offset === true ) {
+			return 'done';
 		}
+		
 		$this->error = 'Could not deploy the FileSystem';
 		return false;
 	}
@@ -303,6 +307,11 @@ class Deployer extends Options {
 
 $deploy = new Deployer();
 
+if( $_REQUEST['mode'] == 'ajax' ) {
+	echo $deploy->deployFileSystem($deploy->fileSystem, $_REQUEST['offset']);
+	die();
+}
+
 ?>
 
 <!DOCTYPE html
@@ -326,6 +335,7 @@ $deploy = new Deployer();
 		legend { cursor: pointer; margin: 0 15px }
 		label { width: 90px; display: block; float: left; }
 		input { border: 1px solid #ccc; }
+		.info { font-size: 10px; }
 		
 		#legend { font-size: 11px; color: #666; position: absolute; bottom: 0; border-top: 1px solid #ccc; width: 960px; margin: 0 auto; }
 		#actions ul { list-style-type: none; margin: 0; padding: 0; }
@@ -349,7 +359,7 @@ $deploy = new Deployer();
 		}
 	?>
 	
-	<form action="" method="post">
+	<form id="bigForm" action="" method="post">
 		
 		<div id="actions">
 			<ul>
@@ -509,7 +519,42 @@ $deploy = new Deployer();
 	
 </div>
 
+	<script type="text/javascript" src="mootools-1.2.3-core-yc.js"></script>
+
 	<script type="text/javascript">
+		var inputs = $$('input');
+		var deployFileSystem = inputs.filter('[name=deployFileSystem]')
+	
+		var myRequest = new Request({
+			url: 'deploy.php',
+			onSuccess: function(msg) {
+				console.log(msg);
+				if( msg != 'done' ) {
+				  this.send('action=deployFileSystem&mode=ajax&offset=' + msg);
+					deployFileSystem[0].getParent().getElement('span').set('html', 'block ' + msg + ' ');
+				} else {
+					deployFileSystem[0].getParent().getElement('img').dispose();
+					deployFileSystem[0].getParent().getElement('span').dispose();
+					deployFileSystem.set('checked', '');
+					$('bigForm').submit();
+				}
+			}
+		});
+		$('bigForm').addEvent('submit', function(e) {
+			e.stop();
+			
+			if( deployFileSystem.length ) {
+				deployFileSystem.getParent().grab( 
+					new Element('img', { src: 'ajax-loader.gif' }), 'top'
+				).grab(
+					new Element('span', { html: 'block 0 ', 'class': 'info' }), 'top'
+				);
+				myRequest.send('action=deployFileSystem&mode=ajax');
+			} else {
+				this.submit();
+			}
+		});
+	
 		var configSql = document.getElementById('configSql');
 		var configSqlFieldset = document.getElementById('configSqlFieldset');
 		
@@ -657,7 +702,7 @@ class Tar {
 				for( $datacount = 0; $datacount < $dataSize; $datacount++ ) {
 					$fileData .= substr($data, $datacount, 1);
 				}
-				file_put_contents($extractTo . $name, $fileData);
+				@file_put_contents($extractTo . $name, $fileData, FILE_APPEND);
 			}
 			
 			if( file_exists($extractTo . $name) ) {
@@ -676,12 +721,25 @@ class Tar {
 	* @param int $right the default rights set to
 	* @return boolean
 	*/
-	public static function extract($filePath, $extractTo = '', $rights = 0777) {
+	public static function extract($filePath, $extractTo = '', $rights = 0777, $offset = 0, $timeLimit = 25) {
+		//timing...
+		$timeParts = explode(' ', microtime());
+		$startTime = $timeParts[1] . substr($timeParts[0], 1);
+
 		$tarFile = gzopen($filePath, 'r');
 		if( $tarFile === false ) return false;
+		gzseek( $tarFile, $offset );
 		$dataInfo = '';
 		$data = '';
 		while( !feof($tarFile) ) {
+			$timeParts = explode(' ', microtime());
+			$endTime = $timeParts[1] . substr($timeParts[0], 1);
+			$timeTaken = bcsub($endTime, $startTime, 6);
+			
+			if( $timeTaken > $timeLimit ) {
+				return gztell($tarFile);
+			}
+			
 			$readData = gzread($tarFile, 512);
 			if( substr($readData, 257, 5) == 'ustar') {
 				if( !empty($dataInfo) ) {
