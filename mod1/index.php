@@ -72,8 +72,6 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	
 		if (($this->id && $access) || ($BE_USER->user['admin'] && !$this->id))	{
 		
-			$this->content .= $this->header('Complete Backup');
-			
 			if( !isset($TYPO3_CONF_VARS['EXT']['extConf']['completebackup']) )
 				die('did you click the Update button while Installing the Extension?');
 			$this->conf = unserialize($TYPO3_CONF_VARS['EXT']['extConf']['completebackup']);
@@ -120,9 +118,15 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			}
 		}
 		if( $this->conf['fileSystemBackup'] ) {
-			if( $this->createFileSystemBackup($fileSystemName) ) {
-				$content .= '<li>The Backup for the FileSystem has been created [<a href="../' . $this->conf['backupPath'] . $fileSystemName . '">' . $fileSystemName . '</a>]</li>';
+			$content .= '<li>The Backup for the FileSystem';
+			if( t3lib_extMgm::isLoaded('mpm') ) {
+				$content .= '<span id="FileSystemBackup"> gets created </span>';
+			} else {
+				if( $this->createFileSystemBackup($fileSystemName) ) {
+					$content .= '<span id="FileSystemBackup"> has been created </span>';
+				}
 			}
+			$content .= '[<a href="../' . $this->conf['backupPath'] . $fileSystemName . '">' . $fileSystemName . '</a>]</li>';
 		}
 		
 		if( $this->conf['cleanDb'] ) {
@@ -363,12 +367,14 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	 * @return	void
 	 */
 	function printContent()	{
-		$this->content .= $this->footer();
-		echo $this->content;
+		$content = $this->header('Complete Backup');
+		$content .= $this->content;
+		$content .= $this->footer();
+		echo $content;
 	}
 	
 	function header() {
-		return '<!DOCTYPE html
+		$header = '<!DOCTYPE html
      PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="de" lang="de">
@@ -377,11 +383,63 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	<title>Complete Backup</title>
 	<link rel="stylesheet" type="text/css" href="stylesheet.css" />
 	<link rel="stylesheet" type="text/css" href="sysext/t3skin/stylesheets/stylesheet_post.css" />
+		';
+	
+		$js = "
+			\$require('Core/Utilities/DomReady.js');
+			\$require('Core/Request/Request.js');
+			\$require('Core/Utilities/Json.js');
+
+			window.addEvent('domready', function() {
+			
+				var myRequest = new Request({
+					url: 'mod.php?M=tools_txcompletebackupM1',
+					onSuccess: function(msg) {
+						console.log(msg);
+					}
+				});
+
+				console.log('ready');
+				myRequest.send();
+				
+			});
+		";
+		if( t3lib_extMgm::isLoaded('mpm') ) {
+			require_once( '../' . t3lib_extMgm::siteRelPath('mpm') . 'res/MPM/Classes/class.Mpr.php');
+			$localMPR = new MPR( array(
+				'pathToMpr' => '../typo3conf/ext/mpr/res/MPR/',
+				'cachePath' => '../typo3temp/mpm/cache/',
+				'jsMinPath' => PATH_typo3 . 'contrib/jsmin/jsmin.php',
+				'cache' => false,
+				'externalFiles' => true,
+				'compressJs' => 'none',
+				'compressCss' => 'minify',
+				'pathPreFix'   => PATH_typo3
+			));
+			
+			$scriptTag = $localMPR->getScriptTagInlineCss( $js );
+			
+			$header .= '
+				<script type="text/javascript">
+					var MPR = {};
+					MPR.path = \'../typo3conf/ext/mpr/res/MPR/\';
+				</script>
+			';
+			$header .= $scriptTag;		
+		} else {
+			$topMsg = 'You need the Extension MPM to use ajax for compression as a usual TYPO3 installation takes way to long for a single PHP execution.';
+		}
+		
+	$header .= '
+	<script type="text/javascript">
+		' . $js . '
+	</script>
 </head>
 <body>
-
+	' . $topMsg . '
 <div class="typo3-bigDoc">
 		';
+		return $header;
 	}
 	
 	function footer() {
