@@ -72,10 +72,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	
 		if (($this->id && $access) || ($BE_USER->user['admin'] && !$this->id))	{
 		
-			$this->doc = t3lib_div::makeInstance("bigDoc");
-			$this->doc->backPath = $BACK_PATH;
-			$this->content .= $this->doc->startPage('Complete Backup');
-			$this->content .= $this->doc->header('Complete Backup');
+			$this->content .= $this->header('Complete Backup');
 			
 			if( !isset($TYPO3_CONF_VARS['EXT']['extConf']['completebackup']) )
 				die('did you click the Update button while Installing the Extension?');
@@ -93,10 +90,6 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 				$this->content .= $this->createBackup();
 			else
 				$this->content .= $this->showMenu();
-				
-			// ShortCut
-			if ($BE_USER->mayMakeShortcut())
-				$this->content .= $this->doc->spacer(20) . $this->doc->section("",$this->doc->makeShortcutIcon("id",implode(",",array_keys($this->MOD_MENU)),$this->MCONF["name"]));
 
 		} else // If no access or if ID == zero
 			$this->content = 'you don\'t belong here... (no access)';
@@ -112,6 +105,8 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$this->conf['cleanFileSystem'] = (isset($getConf['cleanFileSystem']) && $getConf['cleanFileSystem'] == 'on') ? 1 : 0;
 		$this->conf['fileSystemBackup'] = (isset($getConf['fileSystemBackup']) && $getConf['fileSystemBackup'] == 'on') ? 1 : 0;
 		$this->conf['dataBaseBackup'] = (isset($getConf['dataBaseBackup']) && $getConf['dataBaseBackup'] == 'on') ? 1 : 0;
+		
+		$this->conf['compressFileSystem'] = false;
 		
 		$name = date('Y_m_d-Hm') . '_' . $this->conf['filename'];
 		$fileSystemName = ($this->conf['compressFileSystem']) ? $name . '.tar.gz' : $name . '.tar';
@@ -227,11 +222,20 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$files = $_REQUEST['completebackup']['files'];
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
-		$fileSystem = new Tar( $this->conf['compressFileSystem'] );
-		if( $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name) ) {
+		if( !$this->conf['compressFileSystem'] ) 
+			$fileSystem = new Tar();
+		else
+			$fileSystem = new TarGz();
+			
+		// if( isset($_REQUEST['list']) ) 
+			// $open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'a');
+		// else
+			$open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'w');			
+			
+		if( $open ) {
 
 			foreach( $files as $file => $state ) {
-				if ( is_dir( PATH_site . $file) )
+				if ( is_dir(PATH_site . $file) )
 					$fileSystem->addDir( PATH_site . $file, $file );
 				else
 					$fileSystem->addFile( PATH_site . $file, $file);
@@ -243,6 +247,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 					$fileSystem->removeFile($removeMe);
 				}
 			}
+			$fileSystem->save();
 			
 			return $fileSystem->close();
 		}
@@ -254,6 +259,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$content .= '
 			<h3>Just hit the Button</h3>
 			<form action="" method="post">
+				<div>
 				<button style="font-size: 40px; padding: 10px 40px;">DO THE JOB</button><br /> <br />
 				<div style="margin: 15px 0 5px; color: #ff3333; font-weight: bold;">You usually don\'t want to mess with the options below</div>
 				<fieldset>
@@ -283,6 +289,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 					' . $this->getCheckBox('completebackup[conf][cleanFileSystem]', $this->conf['cleanFileSystem']) . ' clean the FileSystem <br />' . PHP_EOL . ' 
 					' . $this->getCheckBox('completebackup[conf][cleanDb]', $this->conf['cleanDb']) . ' clean the Database <br />' . PHP_EOL . ' 
 				</fieldset>
+				</div>
 			</form>
 		';
 		
@@ -292,14 +299,14 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	function getFilterCheckBox($name, $value = '', $array = array() ) {
 		$content = '<input type="checkbox" name="' . $name . '" ';
 		$content .=	in_array($value, $array) ? '' : 'checked="checked"';
-		$content .= '" /> ';
+		$content .= ' /> ';
 		return $content;
 	}
 	
 	function getCheckBox($name, $checked) {
 		$content = '<input type="checkbox" name="' . $name . '" ';
 		$content .= $checked ? 'checked="checked"' : '';
-		$content .= '" /> ';
+		$content .= ' /> ';
 		return $content;
 	}
 
@@ -356,8 +363,29 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	 * @return	void
 	 */
 	function printContent()	{
-		$this->content .= $this->doc->endPage();
+		$this->content .= $this->footer();
 		echo $this->content;
+	}
+	
+	function header() {
+		return '<!DOCTYPE html
+     PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="de" lang="de">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title>Complete Backup</title>
+	<link rel="stylesheet" type="text/css" href="stylesheet.css" />
+	<link rel="stylesheet" type="text/css" href="sysext/t3skin/stylesheets/stylesheet_post.css" />
+</head>
+<body>
+
+<div class="typo3-bigDoc">
+		';
+	}
+	
+	function footer() {
+		return '</div></body></html>';
 	}
 
 }
