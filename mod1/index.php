@@ -84,10 +84,24 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			$mode = '';
 			$mode = $_REQUEST['completebackup']['mode'];
 			
-			if ( $mode )
-				$this->content .= $this->createBackup();
-			else
-				$this->content .= $this->showMenu();
+			$this->conf['compressFileSystem'] = false;
+			
+			switch( $mode ) {
+				case 'createBackup':
+					$this->content .= $this->createBackup();
+					break;
+				case 'ajax':
+					$list = ( isset($_REQUEST['completebackup']['list']) ) ? $_REQUEST['completebackup']['list'] : NULL;
+					$offset = ( isset($_REQUEST['completebackup']['offset']) ) ? $_REQUEST['completebackup']['offset'] : 0;
+					$name = ( isset($_REQUEST['completebackup']['name']) ) ? $_REQUEST['completebackup']['name'] : 'nameError';
+					echo $this->createFileSystemBackup($name, $list, $offset);
+					die();
+					break;
+				default:
+					$this->content .= $this->showMenu();
+			}
+				
+			$this->printContent();
 
 		} else // If no access or if ID == zero
 			$this->content = 'you don\'t belong here... (no access)';
@@ -104,14 +118,12 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		$this->conf['fileSystemBackup'] = (isset($getConf['fileSystemBackup']) && $getConf['fileSystemBackup'] == 'on') ? 1 : 0;
 		$this->conf['dataBaseBackup'] = (isset($getConf['dataBaseBackup']) && $getConf['dataBaseBackup'] == 'on') ? 1 : 0;
 		
-		$this->conf['compressFileSystem'] = false;
-		
 		$name = date('Y_m_d-Hm') . '_' . $this->conf['filename'];
 		$fileSystemName = ($this->conf['compressFileSystem']) ? $name . '.tar.gz' : $name . '.tar';
 		$sqlName = ($this->conf['compressDb']) ? $name . '.sql.gz' : $name . '.sql';
 
 		$content = '';
-		$content .= '<h3>Backup Process Complete:</h3> <ul>';
+		$content .= '<h3>Backup Process:</h3> <ul>';
 		if( $this->conf['cleanFileSystem'] ) {
 			if( $this->cleanFileSystem() ) {
 				$content .= '<li>The FileSystem got cleaned [removed typo3conf/*_CACHED_*][cleaned typo3temp]</li>';
@@ -120,10 +132,12 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		if( $this->conf['fileSystemBackup'] ) {
 			$content .= '<li>The Backup for the FileSystem';
 			if( t3lib_extMgm::isLoaded('mpm') ) {
-				$content .= '<span id="FileSystemBackup"> gets created </span>';
+				$content .= '<div id="FileSystemFiles" style="display: none; position: absolute;">' . json_encode($_REQUEST['completebackup']['files']) . '</div>';
+				$content .= '<div id="FileSystemName" style="display: none; position: absolute;">' . $fileSystemName . '</div>';
+				$content .= '<span id="FileSystemBackup">[gets created]</span>';
 			} else {
 				if( $this->createFileSystemBackup($fileSystemName) ) {
-					$content .= '<span id="FileSystemBackup"> has been created </span>';
+					$content .= '<span> has been created </span>';
 				}
 			}
 			$content .= '[<a href="../' . $this->conf['backupPath'] . $fileSystemName . '">' . $fileSystemName . '</a>]</li>';
@@ -222,7 +236,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		return file_get_contents( $url );
 	}
 	
-	function createFileSystemBackup($name) {
+	function createFileSystemBackup($name, $list = NULL, $offset = 0) {
 		$files = $_REQUEST['completebackup']['files'];
 		
 		require_once t3lib_extMgm::extPath('completebackup') . 'Resources/Php/class.Tar.php';
@@ -231,29 +245,42 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		else
 			$fileSystem = new TarGz();
 			
-		// if( isset($_REQUEST['list']) ) 
-			// $open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'a');
-		// else
-			$open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'w');			
+		if( isset($list) ) 
+			$open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'a');
+		else
+			$open = $fileSystem->open(PATH_site . $this->conf['backupPath'] . $name, 'w');
 			
 		if( $open ) {
-
-			foreach( $files as $file => $state ) {
-				if ( is_dir(PATH_site . $file) )
-					$fileSystem->addDir( PATH_site . $file, $file );
-				else
-					$fileSystem->addFile( PATH_site . $file, $file);
-			}
-			
-			$filesToRemove = glob( PATH_site . $this->conf['backupPath'] . '*' );
-			foreach ( $filesToRemove as $removeMe ) {
-				if( stripos($removeMe, 'index.html') === false ) {
-					$fileSystem->removeFile($removeMe);
+			if( !isset($list) ) {
+				foreach( $files as $file => $state ) {
+					if ( is_dir(PATH_site . $file) )
+						$fileSystem->addDir( PATH_site . $file, $file );
+					else
+						$fileSystem->addFile( PATH_site . $file, $file);
 				}
+				
+				$filesToRemove = glob( PATH_site . $this->conf['backupPath'] . '*' );
+				foreach ( $filesToRemove as $removeMe ) {
+					if( stripos($removeMe, 'index.html') === false ) {
+						$fileSystem->removeFile($removeMe);
+					}
+				}
+				
+			}	else {
+				$fileSystem->setFileList( $list );
 			}
-			$fileSystem->save();
 			
-			return $fileSystem->close();
+			$msg = '';
+			$result = $fileSystem->save($offset, $this->conf['timeout']);
+			
+			if( is_array($result) ) {
+				$myResult = array('completebackup[offset]' => $result['offset'], 'completebackup[list]' => $result['list'], 'completebackup[name]' => $name);
+				$msg = json_encode($myResult);
+			} else
+				$msg = 'done';
+			$fileSystem->close();
+
+			return $msg;
 		}
 		return false;
 	}
@@ -385,25 +412,6 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	<link rel="stylesheet" type="text/css" href="sysext/t3skin/stylesheets/stylesheet_post.css" />
 		';
 	
-		$js = "
-			\$require('Core/Utilities/DomReady.js');
-			\$require('Core/Request/Request.js');
-			\$require('Core/Utilities/Json.js');
-
-			window.addEvent('domready', function() {
-			
-				var myRequest = new Request({
-					url: 'mod.php?M=tools_txcompletebackupM1',
-					onSuccess: function(msg) {
-						console.log(msg);
-					}
-				});
-
-				console.log('ready');
-				myRequest.send();
-				
-			});
-		";
 		if( t3lib_extMgm::isLoaded('mpm') ) {
 			require_once( '../' . t3lib_extMgm::siteRelPath('mpm') . 'res/MPM/Classes/class.Mpr.php');
 			$localMPR = new MPR( array(
@@ -417,23 +425,22 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 				'pathPreFix'   => PATH_typo3
 			));
 			
-			$scriptTag = $localMPR->getScriptTagInlineCss( $js );
+			$scriptTag = $localMPR->getScriptTagInlineCss( file_get_contents('../typo3conf/ext/completebackup/mod1/completebackup.js') );
 			
 			$header .= '
-				<script type="text/javascript">
-					var MPR = {};
-					MPR.path = \'../typo3conf/ext/mpr/res/MPR/\';
-				</script>
-			';
+	<script type="text/javascript">
+		var MPR = {};
+		MPR.path = \'../typo3conf/ext/mpr/res/MPR/\';
+	</script>
+	';
 			$header .= $scriptTag;		
 		} else {
 			$topMsg = 'You need the Extension MPM to use ajax for compression as a usual TYPO3 installation takes way to long for a single PHP execution.';
 		}
 		
 	$header .= '
-	<script type="text/javascript">
-		' . $js . '
-	</script>
+	<script type="text/javascript" src="../typo3conf/ext/completebackup/mod1/completebackup.js"></script>
+
 </head>
 <body>
 	' . $topMsg . '
@@ -460,6 +467,5 @@ $SOBE->init();
 foreach($SOBE->include_once as $INC_FILE)	include_once($INC_FILE);
 
 $SOBE->main();
-$SOBE->printContent();
 
 ?>
