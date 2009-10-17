@@ -19,7 +19,7 @@ window.addEvent('domready', function() {
 						'completebackup[name]': msg['completebackup[name]']
 					};
 					
-					$('FileSystemBackup').set('html', '[' + $H(msg['completebackup[list]']).getLength() + ' files to write]' );
+					$('FileSystemBackup').set('html', '[<img src="gfx/spinner.gif" alt="spinner" />' + $H(msg['completebackup[list]']).getLength() + ' files to write]' );
 					this.send( newParams );
 				}
 				

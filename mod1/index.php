@@ -132,7 +132,7 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			if( t3lib_extMgm::isLoaded('mpm') ) {
 				$content .= '<div id="FileSystemFiles" style="display: none; position: absolute;">' . json_encode($_REQUEST['completebackup']['files']) . '</div>';
 				$content .= '<div id="FileSystemName" style="display: none; position: absolute;">' . $fileSystemName . '</div>';
-				$content .= '<span id="FileSystemBackup">[gets created]</span>';
+				$content .= '<span id="FileSystemBackup">[<img src="gfx/spinner.gif" alt="spinner" /> gets prepared]</span>';
 			} else {
 				if( $this->createFileSystemBackup($fileSystemName) ) {
 					$content .= '<span> has been created </span>';
@@ -408,6 +408,10 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 	<title>Complete Backup</title>
 	<link rel="stylesheet" type="text/css" href="stylesheet.css" />
 	<link rel="stylesheet" type="text/css" href="sysext/t3skin/stylesheets/stylesheet_post.css" />
+	<style type="text/css">
+		a { color: #ff0000; }
+		#FileSystemBackup { color: #ff0000; }
+	</style>
 		';
 	
 		if( t3lib_extMgm::isLoaded('mpm') ) {
