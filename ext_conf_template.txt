@@ -10,20 +10,20 @@ serverUrl =
 # cat=basic/enable; type=string; label=Additional Server Info: You can give some extra info that will be sent to the server (get param &additionalInfo=...)
 additionalInfo =
 
-# cat=basic/enable; type=boolean; label=Notify Server: Notify the Server by default (usually fetches the backupfiles and clears them afterward)
+# cat=basic/enable; type=boolean; label=Notify Server: Notify the Server by default (usually fetches the backupfiles and Cleans them afterward)
 notifyServer = 1
 
 # cat=basic/enable; type=boolean; label=Delete BackupFiles: Delete the backupfiles after they have been fetched by the server (you need to set something for additionalInfo [security])
 deleteFilesByServer = 1
 
-# cat=basic/enable; type=boolean; label=Clear DB: Clear the DB by default (clear all cache tables)
-clearDb = 0
+# cat=basic/enable; type=boolean; label=Clean DB: Clean the DB by default (clean all cache tables)
+cleanDb = 0
 
 # cat=basic/enable; type=boolean; label=Compress DB: Compress the DB with gz
 compressDb = 1
 
-# cat=basic/enable; type=boolean; label=Clear FileSystem: Clear the FileSystem by default (clear all temporary files)
-clearFileSystem = 0
+# cat=basic/enable; type=boolean; label=Clean FileSystem: Clean the FileSystem by default (clean all temporary files)
+cleanFileSystem = 0
 
 # cat=basic/enable; type=boolean; label=Compress FileSystem: Compress the FileSystem Tar with gz
 compressFileSystem = 1
@@ -36,3 +36,6 @@ notDefaultList = typo3_src,.git,.gitmodules,.gitignore
 
 # cat=basic/enable; type=string; label=Path BackupFiles: Path where the BackupFiles should be placed
 backupPath = typo3temp/completebackup/
+
+# cat=basic/enable; type=string; label=FileSystemBackup Timeout: Define the timeout for each ajax request (using multiple step backup creation)
+timeout = 20
