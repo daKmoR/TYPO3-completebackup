@@ -84,8 +84,6 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 			$mode = '';
 			$mode = $_REQUEST['completebackup']['mode'];
 			
-			$this->conf['compressFileSystem'] = false;
-			
 			switch( $mode ) {
 				case 'createBackup':
 					$this->content .= $this->createBackup();
