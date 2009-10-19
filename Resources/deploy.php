@@ -1,5 +1,304 @@
 <?php
 
+class TarGz extends Tar {
+
+	function open( $filePath, $mode='w' ) {
+		$this->tarFilePath = $filePath;
+		$this->tarFile = @gzopen($filePath, $mode);
+		return is_resource($this->tarFile);
+	}
+	
+	function write($content) {
+		return gzwrite($this->tarFile, $content);
+	}
+
+	function close() {
+		return gzclose($this->tarFile);
+	}
+	
+}
+
+class Tar {
+
+	var $fileList = array();
+	var $path = '';
+	var $tarFile;
+	var $cut = 0;
+	var $rights = 0777;
+	
+	function open( $filePath, $mode='w' ) {
+		$this->tarFilePath = $filePath;
+		$this->tarFile = @fopen($filePath, $mode);
+		return is_resource($this->tarFile);
+	}
+	
+	function addFile( $path, $file = '') {
+		if ( is_file($path) ) {
+			$this->fileList[$file] = $path;
+			return true;
+		}
+		return false;
+	}
+	
+	function setFileList( $fileList ) {
+		if( is_array($fileList) ) {
+			$this->fileList = $fileList;
+			return true;
+		}
+		return false;
+	}
+	
+	function removeFile( $what ) {
+		if( isset($this->fileList[$what]) ) {
+			unset( $this->fileList[$what] );
+			return true;
+		} elseif( ($key = array_search($what, $this->fileList)) !== false ) {
+			unset( $this->fileList[$key] );
+			return true;
+		}
+		return false;
+	}
+	
+	function _addDir($path, $_dir = '', $depth = 10) {
+		if( file_exists($path) ) {
+			$this->fileList[$_dir] = $path;
+			$d = dir($path);
+			while (false !== ($dir = $d->read()) ) {
+				if( ( $dir != "." && $dir != ".." ) ) {
+					if ( is_dir($d->path . $dir) ) {
+						if ( $depth >= 1 ) {
+							$this->_addDir($d->path . $dir . '/', substr($d->path, $this->cut, strlen($d->path)) . $dir . '/', $depth-1);
+						}
+					} else {
+						$this->addFile( $d->path . $dir, substr($d->path, $this->cut, strlen($d->path)) . $dir );
+					}
+				}
+			}
+			$d->close();
+		}
+		return false;
+	}
+	
+	function addDir($path, $dir) {
+		if( $path != '' && substr($path, -1) != DIRECTORY_SEPARATOR ) {
+			$path .= '/';
+		}		
+		if( $dir != '' && substr($dir, -1) != DIRECTORY_SEPARATOR ) {
+			$dir .= '/';
+		}
+		$this->cut = strlen( dirname($path) ) + 1;
+		
+		$this->_addDir($path, $dir);
+	}
+	
+	function add($pattern) {
+		$files = glob($pattern);
+		foreach($files as $file) {
+			if( is_file($file) ) {
+				$this->addFile($file, basename($file) );
+			} elseif( is_dir($file) ) {
+				$this->addDir($file, dirname($file) );
+			}
+		}
+	}
+	
+	function getFileHeader($file, $filePath) {
+		$permissions = '00000000';
+		$userid = '00000000';
+		$groupid = '00000000';
+		
+		$eightBit = '';
+		while( strlen($eightBit) < 8 )
+			$eightBit .= chr(0);
+
+		while( strlen($file) < 100 )
+			$file .= chr(0);
+			
+		$ustar = 'ustar  ' . chr(0);
+		
+		if ( is_dir($filePath) ) {
+			$fileSize = '0' . chr(0);
+		}	else {
+			$fileSize = sprintf('%o', filesize($filePath) ) . chr(0);
+		}
+		while( strlen($fileSize) < 12 )
+			$fileSize = '0' . $fileSize;
+		
+		$modtime = sprintf('%o', filectime($filePath) ) . chr(0);
+		$checksum = '        ';
+		if( is_dir($filePath) ) {
+			$indicator = 5;
+		} else {
+			$indicator = 0;
+		}
+
+		$linkName = '';
+		while( strlen($linkName) < 100 )
+			$linkName .= chr(0);
+		
+		$user = '';
+		while( strlen($user) < 32 )
+			$user .= chr(0);
+		
+		$group = '';
+		while( strlen($group) < 32 )
+			$group .= chr(0);
+		
+		$devmajor = $eightBit;
+		$devminor = $eightBit;
+		
+		$prefix = '';
+		while( strlen($prefix) < 155 )
+			$prefix .= chr(0);
+		
+		$header = $file.$permissions.$userid.$groupid.$fileSize.$modtime.$checksum.$indicator.$linkName.$ustar.$user.$group.$devmajor.$devminor.$prefix;
+		while( strlen($header) < 512 )
+			$header .= chr(0);
+		
+		$checksum = 0;
+		for ($y=0; $y < strlen($header); $y++)
+			$checksum += ord($header[$y]);
+			
+		$checksum = sprintf('%o', $checksum) . chr(0) . ' ';
+		while( strlen($checksum) < 8 )
+			$checksum = '0' . $checksum;
+			
+		$header = $file.$permissions.$userid.$groupid.$fileSize.$modtime.$checksum.$indicator.$linkName.$ustar.$user.$group.$devmajor.$devminor.$prefix;
+		while( strlen($header) < 512 )
+			$header .= chr(0);
+
+		return $header;
+	}
+	
+	function write($content) {
+		return fwrite($this->tarFile, $content);
+	}
+	
+	function save($offset = 0, $timeLimit = 25) {
+		if( !$this->tarFile ) return false;
+		
+		$startTime = microtime(true);
+		ksort($this->fileList);
+		
+		$tmpList = $this->fileList;
+		foreach( $this->fileList as $file => $filePath ) {
+		
+			if( $offset == 0 ) {
+				$header = $this->getFileHeader($file, $filePath);
+				$this->write($header);
+			}
+			
+			if( !is_dir($filePath) ) {
+				$contentfile = fopen($filePath, 'r');
+				fseek($contentfile, $offset);
+				
+				while (!feof($contentfile)) {
+					$data = fread($contentfile, 51200);
+					if( strlen($data) != 51200 ) {
+						while( strlen($data) % 512 != 0 )
+							$data .= chr(0);
+					}
+						
+					$this->write($data);
+					
+					if( (microtime(true) - $startTime) > $timeLimit ) {
+						$newOffset = ftell($contentfile);
+						if( $newOffset == filesize($filePath) ) {
+							$newOffset = 0;
+							unset($tmpList[$file]);
+						}
+						return array('offset' => $newOffset, 'list' => $tmpList);
+					}
+				}
+				
+			}
+			unset($tmpList[$file]);
+			
+		}
+		return true;
+	}
+	
+	function close() {
+		return fclose($this->tarFile);
+	}
+	
+	public function getFileName($dataInfo) {
+		$posCount = 0;
+		$name = '';
+		while( substr($dataInfo,$posCount,1) != chr(0) ) {
+			$name .= substr($dataInfo, $posCount, 1);
+			$posCount++;
+		}
+		return $name;
+	}
+	
+	/**
+	* saves some tar data to the given location and set some default
+	*
+	* @param array $dataInfo
+	* @param array $data
+	* @param string $extractTo path where to extract
+	* @return boolean
+	*/
+	public function saveData($name, $data, $extractTo = '', $flag = FILE_APPEND ) {
+		if( empty($name) || empty($data) ) return false;
+		
+		while( substr($data, -1, 1) == chr(0) )
+			$data = substr($data, 0, strlen($data)-1);
+			
+		@file_put_contents($extractTo . $name, $data);
+			
+		if( file_exists($extractTo . $name) ) {
+			return chmod($extractTo . $name, $this->rights);
+		}
+	}
+
+	/**
+	* extracts a given file to a given location
+	*
+	* @param string $filePath what file to use
+	* @param string $extractTo path where to extract
+	* @return boolean
+	*/
+	public function extract($extractTo = '', $offset = 0, $name = '', $timeLimit = 25) {
+		if( !$this->tarFile ) return false;
+
+		$startTime = microtime(true);
+
+		gzseek( $this->tarFile, $offset );
+		
+		$data = '';
+		while( !feof($this->tarFile) ) {
+			$readData = gzread($this->tarFile, 512);
+			if( substr($readData, 257, 5) == 'ustar') {
+				if( !empty($name) && substr($name, -1) == '/' )
+					@mkdir($extractTo . $name);
+					
+				if( !empty($data) )
+					$this->saveData($name, $data, $extractTo);
+			
+				$name = $this->getFileName($readData);
+				$data = '';
+				
+			} else {
+				$data .= $readData;
+			}
+
+			if( (microtime(true) - $startTime) > $timeLimit ) {
+				if( !empty($data) )
+					$this->saveData($name, $data, $extractTo);
+				return array('offset' => gztell($this->tarFile), 'file' => $name);
+			}
+			
+		}
+		if( !empty($data) )
+			$this->saveData($name, $data, $extractTo);
+		
+		return gzclose($this->tarFile);
+	}	
+	
+}
+
 /**
  * a deploy script for a tared fileSystem and a sql dump (support gz for both)
  *
@@ -233,11 +532,20 @@ class Deployer extends Options {
 	}
 	
 	public function deployFileSystem($fileSystemPath, $offset = 0) {
-		$offset = Tar::extract($fileSystemPath, $this->options->extractPath, 0777, $offset);
-		if( is_int($offset) ) {
-			return $offset;
-		} else if( $offset === true ) {
-			return 'done';
+	
+		$file = '';
+		if( isset($_REQUEST['file']) )
+			$file = $_REQUEST['file'];	
+	
+		$fileSystem = new TarGz();
+		$open = $fileSystem->open($fileSystemPath, 'r');
+		
+		if( $open ) {
+			$result = $fileSystem->extract($this->options->extractPath, $offset, $file);
+			if( is_array($result) )
+				echo json_encode($result);
+			else
+				echo 'done';
 		}
 		
 		$this->error = 'Could not deploy the FileSystem';
@@ -313,7 +621,6 @@ if( $_REQUEST['mode'] == 'ajax' ) {
 }
 
 ?>
-
 <!DOCTYPE html
      PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -520,6 +827,7 @@ if( $_REQUEST['mode'] == 'ajax' ) {
 </div>
 
 	<script type="text/javascript">
+	/* <![CDATA[ */
 //MooTools, <http://mootools.net>, My Object Oriented (JavaScript) Tools. Copyright (c) 2006-2009 Valerio Proietti, <http://mad4milk.net>, MIT Style License.
 
 var MooTools={version:"1.2.3",build:"4980aa0fb74d2f6eb80bcd9f5b8e1fd6fbb8f607"};var Native=function(k){k=k||{};var a=k.name;var i=k.legacy;var b=k.protect;
@@ -745,7 +1053,11 @@ if(c.special!="n"){return Selectors.Pseudo[c.special].call(this,c.a,e);}var f=0;
 while((b=b.previousSibling)){if(b.nodeType!=1){continue;}f++;var a=e.positions[$uid(b)];if(a!=undefined){f=a+f;break;}}e.positions[d]=f;}return(e.positions[d]%c.a==c.b);
 },index:function(a){var b=this,c=0;while((b=b.previousSibling)){if(b.nodeType==1&&++c>a){return false;}}return(c==a);},even:function(b,a){return Selectors.Pseudo["nth-child"].call(this,"2n+1",a);
 },odd:function(b,a){return Selectors.Pseudo["nth-child"].call(this,"2n",a);},selected:function(){return this.selected;},enabled:function(){return(this.disabled===false);
-}});var Request=new Class({Implements:[Chain,Events,Options],options:{url:"",data:"",headers:{"X-Requested-With":"XMLHttpRequest",Accept:"text/javascript, text/html, application/xml, text/xml, */*"},async:true,format:false,method:"post",link:"ignore",isSuccess:null,emulation:true,urlEncoded:true,encoding:"utf-8",evalScripts:false,evalResponse:false,noCache:false},initialize:function(a){this.xhr=new Browser.Request();
+}});var JSON=new Hash({$specialChars:{"\b":"\\b","\t":"\\t","\n":"\\n","\f":"\\f","\r":"\\r",'"':'\\"',"\\":"\\\\"},$replaceChars:function(a){return JSON.$specialChars[a]||"\\u00"+Math.floor(a.charCodeAt()/16).toString(16)+(a.charCodeAt()%16).toString(16);
+},encode:function(b){switch($type(b)){case"string":return'"'+b.replace(/[\x00-\x1f\\"]/g,JSON.$replaceChars)+'"';case"array":return"["+String(b.map(JSON.encode).clean())+"]";
+case"object":case"hash":var a=[];Hash.each(b,function(e,d){var c=JSON.encode(e);if(c){a.push(JSON.encode(d)+":"+c);}});return"{"+a+"}";case"number":case"boolean":return String(b);
+case false:return"null";}return null;},decode:function(string,secure){if($type(string)!="string"||!string.length){return null;}if(secure&&!(/^[,:{}\[\]0-9.\-+Eaeflnr-u \n\r\t]*$/).test(string.replace(/\\./g,"@").replace(/"[^"\\\n\r]*"/g,""))){return null;
+}return eval("("+string+")");}});Native.implement([Hash,Array,String,Number],{toJSON:function(){return JSON.encode(this);}});var Request=new Class({Implements:[Chain,Events,Options],options:{url:"",data:"",headers:{"X-Requested-With":"XMLHttpRequest",Accept:"text/javascript, text/html, application/xml, text/xml, */*"},async:true,format:false,method:"post",link:"ignore",isSuccess:null,emulation:true,urlEncoded:true,encoding:"utf-8",evalScripts:false,evalResponse:false,noCache:false},initialize:function(a){this.xhr=new Browser.Request();
 this.setOptions(a);this.options.isSuccess=this.options.isSuccess||this.isSuccess;this.headers=new Hash(this.options.headers);},onStateChange:function(){if(this.xhr.readyState!=4||!this.running){return;
 }this.running=false;this.status=0;$try(function(){this.status=this.xhr.status;}.bind(this));this.xhr.onreadystatechange=$empty;if(this.options.isSuccess.call(this,this.status)){this.response={text:this.xhr.responseText,xml:this.xhr.responseXML};
 this.success(this.response.text,this.response.xml);}else{this.response={text:null,xml:null};this.failure();}},isSuccess:function(){return((this.status>=200)&&(this.status<300));
@@ -766,10 +1078,12 @@ this.xhr.onreadystatechange=this.onStateChange.bind(this);this.headers.each(func
 return this.send($extend(c,{method:b}));};});Request.implement(a);})();Element.Properties.send={set:function(a){var b=this.retrieve("send");if(b){b.cancel();
 }return this.eliminate("send").store("send:options",$extend({data:this,link:"cancel",method:this.get("method")||"post",url:this.get("action")},a));},get:function(a){if(a||!this.retrieve("send")){if(a||!this.retrieve("send:options")){this.set("send",a);
 }this.store("send",new Request(this.retrieve("send:options")));}return this.retrieve("send");}};Element.implement({send:function(a){var b=this.get("send");
-b.send({data:this,url:a||b.options.url});return this;}});	
+b.send({data:this,url:a||b.options.url});return this;}});
+/* ]]> */
 	</script>
 
 	<script type="text/javascript">
+	/* <![CDATA[ */
 		var inputs = $$('input');
 		var deployFileSystem = inputs.filter('[name=deployFileSystem]');
 	
@@ -777,8 +1091,16 @@ b.send({data:this,url:a||b.options.url});return this;}});
 			url: 'deploy.php',
 			onSuccess: function(msg) {
 				if( msg != 'done' ) {
-				  this.send('action=deployFileSystem&mode=ajax&offset=' + msg);
-					deployFileSystem[0].getParent().getElement('span').set('html', 'block ' + msg + ' ');
+				
+					msg = JSON.decode(msg);
+					if( $chk(msg.file) ) {
+						newParams = {};
+						newParams.data = { mode: 'ajax', action: 'deployFileSystem', offset: msg.offset, file: msg.file };
+						
+						deployFileSystem[0].getParent().getElement('span').set('html', 'block ' + msg.offset + ' ');	
+						this.send( newParams );
+					}
+					
 				} else {
 					deployFileSystem[0].getParent().getElement('span').dispose();
 					deployFileSystem.set('checked', '');
@@ -786,9 +1108,10 @@ b.send({data:this,url:a||b.options.url});return this;}});
 				}
 			}
 		});
+		
 		$('bigForm').addEvent('submit', function(e) {
 			e.stop();
-			if( deployFileSystem.length ) {
+			if( deployFileSystem[0].get('checked') === true ) {
 				deployFileSystem.getParent().grab( new Element('span', { html: 'block 0 ', 'class': 'info' }), 'top' );
 				myRequest.send('action=deployFileSystem&mode=ajax');
 			} else {
@@ -830,7 +1153,7 @@ b.send({data:this,url:a||b.options.url});return this;}});
 			}
 			return pass;
 		}
-
+	/* ]]> */
 	</script>
 
 </body>
@@ -900,109 +1223,6 @@ class Options {
 		return (object) $array;
 	}
 
-}
-
-/**
- * a class to support .tar(.gz) extraction as a static function
- * slightly based on tar and untar from http://php-classes.sourceforge.net/
- * just use 
- *   Tar::extract('myTar.tar');
- *   Tar::extract('myTarGz.tar.gz', 'path/wher/to/extract/');
- *
- * @copyright Copyright belongs to the respective authors
- * @author	Thomas Allmer <at@delusionworld.com>
- * @author Dennis Wronka <reptiler@users.sourceforge.net>
- * @license	MIT-style license
- */
-class Tar {
-
-	/**
-	* saves some tar data to the given location and set some default rights
-	*
-	* @param array $dataInfo
-	* @param array $data
-	* @param string $extractTo path where to extract
-	* @param int $right the default rights set to
-	* @return boolean
-	*/
-	public static function saveDataInfo($dataInfo, $data, $extractTo = '', $rights = 0777) {
-		$posCount = 0;
-		$name = '';
-		while( substr($dataInfo,$posCount,1) != chr(0) ) {
-			$name .= substr($dataInfo, $posCount, 1);
-			$posCount++;
-		}
-		if( !empty($name) ) {
-			if( substr($name, -1) == '/') {
-				@mkdir($extractTo . $name);
-			} else {
-				$dataSize = strlen($data) - 1;
-				while( (substr($data, $dataSize, 1) == chr(0)) && ($dataSize >- 1) ) {
-					$dataSize--;
-				}
-				$dataSize++;
-				$fileData = '';
-				for( $datacount = 0; $datacount < $dataSize; $datacount++ ) {
-					$fileData .= substr($data, $datacount, 1);
-				}
-				@file_put_contents($extractTo . $name, $fileData, FILE_APPEND);
-			}
-			
-			if( file_exists($extractTo . $name) ) {
-				return chmod($extractTo . $name, $rights);
-			}
-			
-		}
-		return false;
-	}
-
-	/**
-	* extracts a given file to a given location
-	*
-	* @param string $filePath what file to use
-	* @param string $extractTo path where to extract
-	* @param int $right the default rights set to
-	* @return boolean
-	*/
-	public static function extract($filePath, $extractTo = '', $rights = 0777, $offset = 0, $timeLimit = 25) {
-		//timing...
-		$timeParts = explode(' ', microtime());
-		$startTime = $timeParts[1] . substr($timeParts[0], 1);
-
-		$tarFile = gzopen($filePath, 'r');
-		if( $tarFile === false ) return false;
-		gzseek( $tarFile, $offset );
-		$dataInfo = '';
-		$data = '';
-		while( !feof($tarFile) ) {
-			$timeParts = explode(' ', microtime());
-			$endTime = $timeParts[1] . substr($timeParts[0], 1);
-			$timeTaken = bcsub($endTime, $startTime, 6);
-			
-			if( $timeTaken > $timeLimit ) {
-				return gztell($tarFile);
-			}
-			
-			$readData = gzread($tarFile, 512);
-			if( substr($readData, 257, 5) == 'ustar') {
-				if( !empty($dataInfo) ) {
-					Tar::saveDataInfo($dataInfo, $data, $extractTo, $rights);
-					$dataInfo = $readData;
-					$data = '';
-				} else {
-					$dataInfo = $readData;
-				}
-			} else {
-				$data .= $readData;
-			}
-		}
-		if( !empty($dataInfo) ) {
-			Tar::saveDataInfo($dataInfo, $data, $extractTo, $rights);
-		}
-		
-		return gzclose($tarFile);
-	}
-	
 }
 
 ?>
