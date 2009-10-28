@@ -393,11 +393,12 @@ class Deployer extends Options {
 			}
 			fclose($handle);
 			foreach( $buffer as $key => $line ) {
-				if( stripos($line, 'baseUrl') !== false ) {
-					$buffer[$key+1] = 'baseUrl = ' . $domain . PHP_EOL;
-					return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
-				}
+				if( stripos($line, 'baseUrl = http://localhost/') !== false && $_SERVER['HTTP_HOST'] === 'localhost' )
+					$buffer[$key] = '  baseUrl = ' . $domain . PHP_EOL;
+				if( stripos($line, 'baseUrl') === 0 )
+					$buffer[$key] = 'baseUrl = ' . $domain . PHP_EOL;
 			}
+			return file_put_contents($this->options->extractPath . $this->options->baseUrlFile, $buffer);
 		}
 		return false;
 	}
@@ -799,7 +800,11 @@ if( $_REQUEST['mode'] == 'ajax' ) {
 					}
 				?>
 			</ul>
-			<p style="text-align: center;"><button type="submit" name="submitted">do the job</button></p>
+			<p style="text-align: center;">
+				<button type="submit" name="submitted">do the job</button>
+				<br />
+				<a href="./">Installation</a> / <a href="./typo3/">Backend</a>
+			</p>
 		</div>
 	
 		<fieldset id="configSqlFieldset">
