@@ -501,6 +501,7 @@ class Deployer extends Options {
 					$this->error = 'Could not create database: ' . mysql_error();
 					return false;
 				} else {
+					mysql_query('ALTER DATABASE `' . $typo_db . '` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci');
 					return mysql_select_db($typo_db, $this->link);
 				}
 			}
