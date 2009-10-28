@@ -94,7 +94,9 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 					$name = ( isset($_REQUEST['completebackup']['name']) ) ? $_REQUEST['completebackup']['name'] : 'nameError';
 					echo $this->createFileSystemBackup($name, $list, $offset);
 					die();
-					break;
+				case 'notify':
+					echo $this->notifyServer( $_REQUEST['completebackup']['file'], $_REQUEST['completebackup']['sql'] );
+					die();
 				default:
 					$this->content .= $this->showMenu();
 			}
@@ -153,11 +155,24 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		}
 		
 		if ( $this->conf['notifyServer'] && $this->conf['serverUrl'] != '' ) {
-			$serverStatus = $this->notifyServer( $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $fileSystemName, $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName );
-			$content .= '<li>The Server (' . $this->conf['serverUrl'] . ') has been notified (It will fetch the backupfiles)</li>';
-			if ( $this->conf['deleteFilesByServer'] ) {
-				$content .= '<li>The Server will delete the BackupFiles afterward. (Status: ' . $serverStatus . ')</li>';
+			$file = $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $fileSystemName;
+			$sql = $this->getPageDIR() . '/../' . $this->conf['backupPath'] . $sqlName;
+			if( t3lib_extMgm::isLoaded('mpm') && $this->conf['fileSystemBackup'] ) {
+				$content .= '<li id="notifyServer">The Server (' . $this->conf['serverUrl'] . ') <span id="notifyServerReady">will be notified once all files are ready</span> (It will fetch the backupfiles)
+						<span id="notifyServerFile" style="display: none;">' . $file . '</span>
+						<span id="notifyServerSql" style="display: none;">' . $sql . '</span>
+					</li>';
+				if ( $this->conf['deleteFilesByServer'] ) {
+					$content .= '<li>The Server will delete the BackupFiles afterward. (Status: <span id="notifyServerResponse">wait for files to be ready</span>)</li>';
+				}
+			} else {
+				$serverStatus = $this->notifyServer( $file, $sql );
+				$content .= '<li>The Server (' . $this->conf['serverUrl'] . ') has been notified (It will fetch the backupfiles)</li>';
+				if ( $this->conf['deleteFilesByServer'] ) {
+					$content .= '<li>The Server will delete the BackupFiles afterward. (Status: ' . $serverStatus . ')</li>';
+				}
 			}
+			
 		}
 		
 		$content .= '</ul>';
