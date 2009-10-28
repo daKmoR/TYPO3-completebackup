@@ -221,22 +221,23 @@ class MySQLDump {
 		$num_fields = @mysql_num_fields($records);
 		// Dump data
 		if ( $num_rows > 0 ) {
-			$data .= $insertStatement;
+			$data = '';
 			for ($i = 0; $i < $num_rows; $i++) {
 				$record = @mysql_fetch_assoc($records);
-				$data .= ' (';
+				$data .= "INSERT INTO `$table` VALUES(";
 				for ($j = 0; $j < $num_fields; $j++) {
 					$field_name = @mysql_field_name($records, $j);
 					if ( $hexField[$j] && (@strlen($record[$field_name]) > 0) )
 						$data .= "0x".$record[$field_name];
 					else
-						$data .= "'".@str_replace('\"','"',@mysql_escape_string($record[$field_name]))."'";
+						$data .= "'".@str_replace(array("\'", '\"'),array("''", '"'),@mysql_real_escape_string($record[$field_name]))."'";
 					$data .= ',';
 				}
 				$data = @substr($data,0,-1).")";
-				$data .= ( $i < ($num_rows-1) ) ? ',' : ';';
-				$data .= "\n";
+				//$data .= ( $i < ($num_rows-1) ) ? ',' : ';';
+				$data .= ";\n";
 				//if data in greather than 1MB save
+				//if (strlen($data) > 1048576) {
 				if (strlen($data) > 1048576) {
 					$this->saveToFile($this->file,$data);
 					$data = '';
@@ -323,10 +324,12 @@ class MySQLDump {
 					$unique[$row->Key_name] .= ", `{$row->Column_name}`";
 			}
 			if (($row->Key_name != 'PRIMARY') AND ($row->Non_unique == '1') AND ($row->Index_type == 'BTREE')) {
+				$size = $row->Sub_part ? '(' . $row->Sub_part . ')' : '';
 				if ( (!is_array($index)) OR ($index[$row->Key_name]=="") )
-					$index[$row->Key_name] = "  KEY `{$row->Key_name}` (`{$row->Column_name}`";
+					$index[$row->Key_name] = "  KEY `{$row->Key_name}` (`{$row->Column_name}`$size";
 				else
-					$index[$row->Key_name] .= ", `{$row->Column_name}`";
+					$index[$row->Key_name] .= ", `{$row->Column_name}`$size";
+				
 			}
 			if (($row->Key_name != 'PRIMARY') AND ($row->Non_unique == '1') AND ($row->Index_type == 'FULLTEXT')) {
 				if ( (!is_array($fulltext)) OR ($fulltext[$row->Key_name]=="") )

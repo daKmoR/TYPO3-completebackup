@@ -91,13 +91,13 @@ class Tar {
 		$this->_addDir($path, $dir);
 	}
 	
-	function add($pattern) {
+	function add($pattern, $path) {
 		$files = glob($pattern);
 		foreach($files as $file) {
 			if( is_file($file) ) {
-				$this->addFile($file, basename($file) );
+				$this->addFile($file, $path);
 			} elseif( is_dir($file) ) {
-				$this->addDir($file, dirname($file) );
+				$this->addDir($file, $path);
 			}
 		}
 	}
