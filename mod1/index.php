@@ -430,19 +430,20 @@ class  tx_completebackup_module1 extends t3lib_SCbase {
 		';
 	
 		if( t3lib_extMgm::isLoaded('mpm') ) {
-			require_once( '../' . t3lib_extMgm::siteRelPath('mpm') . 'res/MPM/Classes/class.Mpr.php');
+			require_once( t3lib_extMgm::extPath('mpm') . 'res/MPM/Classes/class.Mpr.php' );
 			$localMPR = new MPR( array(
-				'pathToMpr' => '../typo3conf/ext/mpr/res/MPR/',
+				'pathToMpr' => t3lib_extMgm::extRelPath('mpr') . 'res/MPR/',
 				'cachePath' => '../typo3temp/mpm/cache/',
+				'cacheAbsPath'    => PATH_site . 'typo3temp/mpm/cache/',
 				'jsMinPath' => PATH_typo3 . 'contrib/jsmin/jsmin.php',
 				'cache' => false,
 				'externalFiles' => true,
 				'compressJs' => 'none',
 				'compressCss' => 'minify',
-				'pathPreFix'   => PATH_typo3
+				'pathPreFix'   => PATH_site . 'typo3conf/'
 			));
 			
-			$scriptTag = $localMPR->getScriptTagInlineCss( file_get_contents('../typo3conf/ext/completebackup/mod1/completebackup.js') );
+			$scriptTag = $localMPR->getScriptTagInlineCss( file_get_contents( PATH_site . 'typo3conf/ext/completebackup/mod1/completebackup.js') );
 			
 			$header .= '
 	<script type="text/javascript">
